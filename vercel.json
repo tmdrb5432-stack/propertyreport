@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/cron/update-kakao", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/update-transactions", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/update-migration", "schedule": "0 5 1 * *" }
+  ]
+}
