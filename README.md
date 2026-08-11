@@ -7,7 +7,8 @@
 ## 기술 스택
 
 - Next.js (App Router) + TypeScript, Tailwind CSS
-- Prisma + SQLite(로컬) — 배포 시 `DATABASE_URL`만 Postgres로 교체
+- Prisma + Postgres (Neon/Supabase/Vercel Postgres 등 — Vercel 서버리스는 파일시스템이
+  휘발성이라 SQLite를 쓸 수 없어, 로컬 개발도 같은 Postgres를 사용합니다)
 - recharts (트렌드 차트), react-kakao-maps-sdk (지도)
 - 카카오 Local REST API (회사/교통 실데이터), 나머지는 실 API 형태에 맞춘 mock 어댑터
 
@@ -28,10 +29,12 @@
 ```bash
 npm install
 cp .env.example .env.local
-# .env.local에 KAKAO_REST_KEY, (있다면) NEXT_PUBLIC_KAKAO_JS_KEY, CRON_SECRET 입력
+# .env.local에 DATABASE_URL(Postgres 연결 문자열), KAKAO_REST_KEY,
+# (있다면) NEXT_PUBLIC_KAKAO_JS_KEY, CRON_SECRET 입력
+# (Neon neon.tech 등에서 무료 Postgres를 바로 만들 수 있습니다)
 
-npx prisma migrate dev   # 최초 1회 (DB 스키마 적용)
-npx prisma db seed       # 5개 지구 시드
+npx prisma migrate deploy   # 최초 1회 (DB 스키마 적용)
+npx prisma db seed          # 5개 지구 시드
 
 npm run dev
 ```
@@ -85,8 +88,10 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/upda
 
 ## 프로덕션 배포 시 유의사항
 
-- Vercel 등 서버리스 환경은 파일시스템이 휘발성이므로 SQLite(`file:./dev.db`)는 로컬 개발용입니다.
-  배포 시 `DATABASE_URL`을 Neon/Supabase/Vercel Postgres 등 호스팅 Postgres로 교체하세요
-  (Prisma 스키마 변경 불필요).
+- Vercel 프로젝트 환경변수에 `DATABASE_URL`(Postgres), `KAKAO_REST_KEY`,
+  `NEXT_PUBLIC_KAKAO_JS_KEY`(있다면), `CRON_SECRET`을 설정하세요.
+- `package.json`의 `vercel-build` 스크립트(`prisma migrate deploy && next build`)가 배포마다
+  자동으로 마이그레이션을 적용하므로, `DATABASE_URL`만 설정되어 있으면 별도 수동 마이그레이션은
+  필요 없습니다.
 - `CRON_SECRET`을 Vercel 프로젝트 환경변수로 설정하면 Vercel Cron이 자동으로
   `Authorization: Bearer $CRON_SECRET` 헤더를 붙여 호출합니다.
