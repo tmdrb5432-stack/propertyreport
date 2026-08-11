@@ -26,7 +26,7 @@ export function CompanyList({ companies }: { companies: NotableCompany[] }) {
             </p>
             <p className="truncate text-xs text-neutral-400">{company.address}</p>
           </div>
-          {company.employeeCount !== null && (
+          {company.employeeCount != null && (
             <div className="shrink-0 text-right">
               <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                 {company.employeeCount.toLocaleString()}명
