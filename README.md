@@ -1,0 +1,92 @@
+# propertyreport — 부동산 분석 대시보드
+
+카카오맵 기반으로 5개 업무지구(광화문·여의도·강남·판교·마곡)를 **직주근접**·**이동편의성**
+관점에서 비교 분석하는 대시보드입니다. 지구별 교통 환경·회사수·주요회사·종사자수를
+갱신하고, 이를 실거래가·호가·전입/전출 변화와 함께 보여줍니다.
+
+## 기술 스택
+
+- Next.js (App Router) + TypeScript, Tailwind CSS
+- Prisma + SQLite(로컬) — 배포 시 `DATABASE_URL`만 Postgres로 교체
+- recharts (트렌드 차트), react-kakao-maps-sdk (지도)
+- 카카오 Local REST API (회사/교통 실데이터), 나머지는 실 API 형태에 맞춘 mock 어댑터
+
+## 이 MVP에서 실데이터 vs mock
+
+| 영역 | 상태 | 비고 |
+|---|---|---|
+| 교통 환경 (지하철/버스) | **실데이터** (카카오) | `KAKAO_REST_KEY` 필요 |
+| 회사수 / 주요회사 | **실데이터** (카카오) | Kakao Local API 페이지네이션 상한(~45건)으로 근사치 |
+| 종사자수 | 추정치 없음 (null) | 카카오 API에 없는 데이터. 별도 소스 필요 |
+| 실거래가 | mock (실 API 응답 형태와 동일한 타입) | 공공데이터포털 국토부 실거래가 키 발급 후 `src/lib/adapters/transactions/realTransactionAdapter.ts` 구현 |
+| 호가 | mock (real 경로 미구현) | 공식 API 없음. 크롤링은 대상 사이트 약관 법적 검토 후 별도 진행 |
+| 전입/전출 | mock (실 API 응답 형태와 동일한 타입) | KOSIS Open API 키 발급 후 `src/lib/adapters/migration/realMigrationAdapter.ts` 구현 |
+| 지도 렌더링 | JS 키 있으면 실제 지도, 없으면 안내 placeholder | `NEXT_PUBLIC_KAKAO_JS_KEY` |
+
+## 시작하기
+
+```bash
+npm install
+cp .env.example .env.local
+# .env.local에 KAKAO_REST_KEY, (있다면) NEXT_PUBLIC_KAKAO_JS_KEY, CRON_SECRET 입력
+
+npx prisma migrate dev   # 최초 1회 (DB 스키마 적용)
+npx prisma db seed       # 5개 지구 시드
+
+npm run dev
+```
+
+`http://localhost:3000` 접속 시 5개 지구 카드가 보이지만, 스냅샷 데이터가 없으면
+빈 값으로 표시됩니다. 아래처럼 크론 라우트를 한 번 수동 호출해 데이터를 채우세요.
+
+## 데이터 채우기 (크론 라우트 수동 호출)
+
+```bash
+CRON_SECRET=여기에_env의_값
+
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-kakao
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-transactions
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-asking-price
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-migration
+```
+
+- `update-kakao`: 카카오 Local API로 회사수/주요회사/교통(지하철·버스) 실데이터 수집
+- `update-transactions`: 실거래가 mock 시계열 생성/갱신 (월 6개월치)
+- `update-asking-price`: 호가 mock 시계열 생성/갱신 (주 8주치) — 데모용 수동 라우트, cron 미등록
+- `update-migration`: 전입/전출 mock 시계열 생성/갱신 (월 6개월치)
+
+## 업데이트 주기
+
+데이터 소스별 현실적 한계를 반영해 주기를 다르게 설계했습니다.
+
+| 소스 | 주기 | 이유 |
+|---|---|---|
+| 카카오 (교통/회사) | 매일 | POI 데이터가 하루 안에 크게 바뀌지 않음 |
+| 실거래가 | 매일 | 국토부 실거래 신고는 계약 후 최대 30일 소요 — 일 단위가 실질적 한계 |
+| 호가 | 수동 (데모용) | 공식 API 없음. 실서비스화 시 크롤링 대상 사이트 약관 검토 필요 |
+| 전입/전출 | 매월 1일 | 통계청 KOSIS는 월 단위로 발표 |
+
+`vercel.json`에 Vercel Cron 스케줄이 정의되어 있습니다 (`update-asking-price`는 의도적으로
+제외). Vercel 미사용 시 GitHub Actions 스케줄 워크플로 등에서 동일한 `curl` 호출로 대체할 수
+있습니다.
+
+## 실데이터로 업그레이드하는 방법
+
+1. **카카오 JavaScript 키**: 카카오 디벨로퍼스 콘솔 > 내 애플리케이션 > 앱 키에서 확인/발급
+   후 `NEXT_PUBLIC_KAKAO_JS_KEY`에 설정하고, 플랫폼 > Web에 도메인을 등록하세요.
+2. **실거래가**: [공공데이터포털](https://www.data.go.kr)에서 "국토교통부_아파트매매 실거래자료"
+   API 키 발급 → `src/lib/adapters/transactions/realTransactionAdapter.ts`의 `fetch` 구현 →
+   `.env.local`에 `TRANSACTION_DATA_SOURCE=real` 설정.
+3. **전입/전출**: [KOSIS Open API](https://kosis.kr/openapi) 키 발급 →
+   `src/lib/adapters/migration/realMigrationAdapter.ts`의 `fetch` 구현 →
+   `MIGRATION_DATA_SOURCE=real` 설정.
+4. **호가**: 공식 API가 없어 이번 빌드에는 포함하지 않았습니다. 크롤링으로 구현하려면 먼저
+   대상 사이트(예: 네이버 부동산)의 이용약관을 검토하세요.
+
+## 프로덕션 배포 시 유의사항
+
+- Vercel 등 서버리스 환경은 파일시스템이 휘발성이므로 SQLite(`file:./dev.db`)는 로컬 개발용입니다.
+  배포 시 `DATABASE_URL`을 Neon/Supabase/Vercel Postgres 등 호스팅 Postgres로 교체하세요
+  (Prisma 스키마 변경 불필요).
+- `CRON_SECRET`을 Vercel 프로젝트 환경변수로 설정하면 Vercel Cron이 자동으로
+  `Authorization: Bearer $CRON_SECRET` 헤더를 붙여 호출합니다.

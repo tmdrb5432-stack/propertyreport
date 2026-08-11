@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model District {
+  id        String   @id // slug: "gwanghwamun" | "yeouido" | "gangnam" | "pangyo" | "magok"
+  nameKo    String
+  nameEn    String
+  lat       Float
+  lng       Float
+  radiusM   Int
+  createdAt DateTime @default(now())
+
+  transitSnapshots     TransitSnapshot[]
+  companySnapshots     CompanySnapshot[]
+  transactionSnapshots TransactionSnapshot[]
+  askingPriceSnapshots AskingPriceSnapshot[]
+  migrationSnapshots   MigrationSnapshot[]
+  updateLogs           UpdateLog[]
+}
+
+model TransitSnapshot {
+  id                 String   @id @default(cuid())
+  districtId         String
+  district           District @relation(fields: [districtId], references: [id])
+  capturedAt         DateTime @default(now())
+  subwayLines        Json // string[]
+  subwayStationCount Int
+  busStopCount       Int
+  transitScore       Float // 0-100 derived 이동편의성 sub-score
+  source             String // "kakao"
+  raw                Json?
+
+  @@index([districtId, capturedAt])
+}
+
+model CompanySnapshot {
+  id               String   @id @default(cuid())
+  districtId       String
+  district         District @relation(fields: [districtId], references: [id])
+  capturedAt       DateTime @default(now())
+  companyCount     Int
+  employeeCount    Int? // estimate only — not sourced from Kakao
+  notableCompanies Json // { name, category, address }[]
+  source           String // "kakao"
+  raw              Json?
+
+  @@index([districtId, capturedAt])
+}
+
+model TransactionSnapshot {
+  id                String   @id @default(cuid())
+  districtId        String
+  district          District @relation(fields: [districtId], references: [id])
+  capturedAt        DateTime @default(now())
+  periodDate        DateTime
+  avgPricePerPyeong Float?
+  avgPriceTotal     Float?
+  medianPriceTotal  Float?
+  transactionCount  Int
+  propertyType      String // "아파트" | "오피스텔" ...
+  source            String // "mock" | "molit"
+  raw               Json?
+
+  @@unique([districtId, propertyType, periodDate])
+  @@index([districtId, capturedAt])
+}
+
+model AskingPriceSnapshot {
+  id                      String   @id @default(cuid())
+  districtId              String
+  district                District @relation(fields: [districtId], references: [id])
+  capturedAt              DateTime @default(now())
+  periodDate              DateTime
+  avgAskingPricePerPyeong Float?
+  avgAskingPriceTotal     Float?
+  listingCount            Int
+  propertyType            String
+  source                  String // "mock"
+  raw                     Json?
+
+  @@unique([districtId, propertyType, periodDate])
+  @@index([districtId, capturedAt])
+}
+
+model MigrationSnapshot {
+  id           String   @id @default(cuid())
+  districtId   String
+  district     District @relation(fields: [districtId], references: [id])
+  capturedAt   DateTime @default(now())
+  periodMonth  String // "2026-07"
+  inMigration  Int
+  outMigration Int
+  netMigration Int
+  source       String // "mock" | "kosis"
+  raw          Json?
+
+  @@unique([districtId, periodMonth])
+  @@index([districtId, capturedAt])
+}
+
+model UpdateLog {
+  id         String   @id @default(cuid())
+  districtId String
+  district   District @relation(fields: [districtId], references: [id])
+  metricType String // "transit" | "company" | "transaction" | "asking" | "migration"
+  status     String // "success" | "error"
+  message    String?
+  ranAt      DateTime @default(now())
+
+  @@index([districtId, metricType, ranAt])
+}
