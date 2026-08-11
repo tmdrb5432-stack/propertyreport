@@ -4,6 +4,7 @@ const METRIC_LABEL: Record<string, string> = {
   transit: "교통",
   company: "회사",
   transaction: "실거래가",
+  complexTransaction: "단지별 실거래가",
   asking: "호가",
   migration: "전입/전출",
 };

@@ -19,12 +19,13 @@ model District {
   radiusM   Int
   createdAt DateTime @default(now())
 
-  transitSnapshots     TransitSnapshot[]
-  companySnapshots     CompanySnapshot[]
-  transactionSnapshots TransactionSnapshot[]
-  askingPriceSnapshots AskingPriceSnapshot[]
-  migrationSnapshots   MigrationSnapshot[]
-  updateLogs           UpdateLog[]
+  transitSnapshots            TransitSnapshot[]
+  companySnapshots            CompanySnapshot[]
+  transactionSnapshots        TransactionSnapshot[]
+  complexTransactionSnapshots ComplexTransactionSnapshot[]
+  askingPriceSnapshots        AskingPriceSnapshot[]
+  migrationSnapshots          MigrationSnapshot[]
+  updateLogs                  UpdateLog[]
 }
 
 model TransitSnapshot {
@@ -48,7 +49,7 @@ model CompanySnapshot {
   district         District @relation(fields: [districtId], references: [id])
   capturedAt       DateTime @default(now())
   companyCount     Int
-  employeeCount    Int? // estimate only — not sourced from Kakao
+  employeeCount    Int? // sum of per-company employeeCount (real DART where matched, else estimate)
   notableCompanies Json // { name, category, address }[]
   source           String // "kakao"
   raw              Json?
@@ -71,6 +72,25 @@ model TransactionSnapshot {
   raw               Json?
 
   @@unique([districtId, propertyType, periodDate])
+  @@index([districtId, capturedAt])
+}
+
+model ComplexTransactionSnapshot {
+  id                String   @id @default(cuid())
+  districtId        String
+  district          District @relation(fields: [districtId], references: [id])
+  capturedAt        DateTime @default(now())
+  periodDate        DateTime
+  complexName       String // 아파트 단지명 — free-text identity, matches MOLIT's 아파트명 field
+  avgPricePerPyeong Float?
+  avgPriceTotal     Float?
+  medianPriceTotal  Float?
+  transactionCount  Int
+  propertyType      String // "아파트"
+  source            String // "mock" | "molit"
+  raw               Json?
+
+  @@unique([districtId, complexName, propertyType, periodDate])
   @@index([districtId, capturedAt])
 }
 
@@ -117,4 +137,28 @@ model UpdateLog {
   ranAt      DateTime @default(now())
 
   @@index([districtId, metricType, ranAt])
+}
+
+// Listed-company corp codes from OpenDART's corpCode.xml master list, filtered
+// to entries that have a stock code (상장사만) — unlisted companies have no
+// public employee-status disclosure via OpenDART, so they are never stored
+// here and fall back to a heuristic estimate at query time instead.
+model DartCorpCode {
+  corpCode   String  @id // DART 고유번호 (8자리) — NOT the stock ticker
+  corpName   String
+  stockCode  String?
+  modifyDate String?
+
+  @@index([corpName])
+}
+
+// Read-through cache for OpenDART's 직원현황(empSttus) API so a company's
+// employee count is fetched from DART at most once per cache window instead
+// of on every cron run.
+model DartEmployeeCache {
+  corpCode      String   @id
+  employeeCount Int?
+  bsnsYear      String
+  reprtCode     String
+  fetchedAt     DateTime @default(now())
 }

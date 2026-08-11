@@ -3,6 +3,7 @@ import { DISTRICTS } from "@/lib/districts";
 import { computeJobHousingIndex } from "@/lib/scoring/jobHousingIndex";
 import { computeMobilityIndex } from "@/lib/scoring/mobilityIndex";
 import { getDistrictFreshness, type FreshnessInfo } from "@/lib/freshness";
+import type { NotableCompany } from "@/lib/adapters/types";
 
 export interface DistrictOverview {
   id: string;
@@ -111,7 +112,7 @@ export interface DistrictDetail {
   lng: number;
   companyCount: number | null;
   employeeCount: number | null;
-  notableCompanies: { name: string; category: string; address: string }[];
+  notableCompanies: NotableCompany[];
   transitScore: number | null;
   subwayLines: string[];
   subwayStationCount: number | null;
@@ -182,9 +183,7 @@ export async function getDistrictDetail(
     companyCount: company?.companyCount ?? null,
     employeeCount: company?.employeeCount ?? null,
     notableCompanies:
-      (company?.notableCompanies as
-        | { name: string; category: string; address: string }[]
-        | undefined) ?? [],
+      (company?.notableCompanies as NotableCompany[] | undefined) ?? [],
     transitScore: transit?.transitScore ?? null,
     subwayLines: (transit?.subwayLines as string[] | undefined) ?? [],
     subwayStationCount: transit?.subwayStationCount ?? null,
@@ -194,4 +193,74 @@ export async function getDistrictDetail(
     migrations,
     freshness,
   };
+}
+
+export interface ComplexTransactionPoint {
+  periodDate: Date;
+  avgPricePerPyeong: number | null;
+  transactionCount: number;
+}
+
+export interface TopComplex {
+  complexName: string;
+  latestPeriodDate: Date;
+  latestAvgPricePerPyeong: number | null;
+  latestAvgPriceTotal: number | null;
+  latestTransactionCount: number;
+  trend: ComplexTransactionPoint[];
+}
+
+/**
+ * Top N apartment complexes in a district by latest 실거래가 (평당가), each
+ * with its recent trend for a mini chart. Prisma has no native "latest row
+ * per group, then order by that value" query, so this fetches the full
+ * per-complex history (bounded — a handful of complexes x 6 months per
+ * district) and does the latest-per-complex + ranking in JS.
+ */
+export async function getTopComplexesForDistrict(
+  districtId: string,
+  limit = 3,
+): Promise<TopComplex[]> {
+  const rows = await prisma.complexTransactionSnapshot.findMany({
+    where: { districtId, propertyType: "아파트" },
+    orderBy: { periodDate: "asc" },
+    select: {
+      complexName: true,
+      periodDate: true,
+      avgPricePerPyeong: true,
+      avgPriceTotal: true,
+      transactionCount: true,
+    },
+  });
+
+  const byComplex = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const existing = byComplex.get(row.complexName);
+    if (existing) existing.push(row);
+    else byComplex.set(row.complexName, [row]);
+  }
+
+  const complexes: TopComplex[] = [];
+  for (const [complexName, history] of byComplex) {
+    const latest = history[history.length - 1];
+    if (latest.avgPricePerPyeong === null) continue;
+    complexes.push({
+      complexName,
+      latestPeriodDate: latest.periodDate,
+      latestAvgPricePerPyeong: latest.avgPricePerPyeong,
+      latestAvgPriceTotal: latest.avgPriceTotal,
+      latestTransactionCount: latest.transactionCount,
+      trend: history.map((h) => ({
+        periodDate: h.periodDate,
+        avgPricePerPyeong: h.avgPricePerPyeong,
+        transactionCount: h.transactionCount,
+      })),
+    });
+  }
+
+  complexes.sort(
+    (a, b) => (b.latestAvgPricePerPyeong ?? 0) - (a.latestAvgPricePerPyeong ?? 0),
+  );
+
+  return complexes.slice(0, limit);
 }

@@ -11,7 +11,7 @@ const PROPERTY_TYPE = "아파트";
 // Illustrative base price level per district (만원/평), roughly reflecting
 // relative Seoul-area market intuition. Not sourced from any real dataset —
 // purely to make mock trend lines look plausible until MOLIT data is wired in.
-const BASE_PRICE_PER_PYEONG: Record<string, number> = {
+export const BASE_PRICE_PER_PYEONG: Record<string, number> = {
   gangnam: 8000,
   yeouido: 6500,
   gwanghwamun: 6000,
@@ -19,7 +19,7 @@ const BASE_PRICE_PER_PYEONG: Record<string, number> = {
   magok: 3500,
 };
 
-function monthStart(monthsAgo: number): Date {
+export function monthStart(monthsAgo: number): Date {
   const d = new Date();
   d.setUTCDate(1);
   d.setUTCHours(0, 0, 0, 0);

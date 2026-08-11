@@ -7,7 +7,14 @@ export interface FreshnessInfo {
   message: string | null;
 }
 
-const METRIC_TYPES = ["transit", "company", "transaction", "asking", "migration"] as const;
+const METRIC_TYPES = [
+  "transit",
+  "company",
+  "transaction",
+  "complexTransaction",
+  "asking",
+  "migration",
+] as const;
 
 /** Latest UpdateLog entry per metric type for a single district. */
 export async function getDistrictFreshness(districtId: string): Promise<FreshnessInfo[]> {
