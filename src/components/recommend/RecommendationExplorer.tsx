@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { RecommendedComplex } from "@/lib/queries";
 import { DISTRICTS } from "@/lib/districts";
@@ -66,14 +66,7 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
   );
   const [areaBand, setAreaBand] = useState<(typeof AREA_BANDS)[number]["key"]>("all");
   const [priceBand, setPriceBand] = useState<(typeof PRICE_BANDS)[number]["key"]>("all");
-  // What the map is centered/zoomed on — defaults to the #1 result so the
-  // map never sits on a wide, unfocused view. Independent from whether the
-  // bottom detail popup is open.
-  const [focusedKey, setFocusedKey] = useState<string | null>(null);
-  // Which result's detail popup is open at the bottom — null until the user
-  // actually clicks a card or a map pin, so the map + full 5-card list are
-  // visible together on first load.
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   function toggleDistrict(id: string) {
     setDistrictFilter((prev) => {
@@ -102,23 +95,10 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
       .slice(0, RESULT_COUNT);
   }, [complexes, districtFilter, areaBand, priceBand]);
 
-  function openDetail(key: string) {
-    setFocusedKey(key);
-    setOpenKey(key);
-  }
-
-  // Lock page scroll while the bottom sheet is open.
-  useEffect(() => {
-    if (openKey === null) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [openKey]);
-
-  const focused = results.find((c) => keyOf(c) === focusedKey) ?? results[0] ?? null;
-  const openComplex = openKey ? (results.find((c) => keyOf(c) === openKey) ?? null) : null;
+  // Always shows something on the right — defaults to the #1 result so both
+  // the map and the detail pane start focused on a concrete complex, and
+  // naturally recovers if a filter change drops the current pick out.
+  const selected = results.find((c) => keyOf(c) === selectedKey) ?? results[0] ?? null;
 
   const markers = results
     .map((c, i) => ({ complex: c, rank: i + 1 }))
@@ -130,9 +110,9 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
       label: `${rank}. ${complex.complexName}`,
       rank,
     }));
-  const hasFocusedCoords = focused?.lat != null && focused?.lng != null;
-  const mapCenter = hasFocusedCoords
-    ? { lat: focused!.lat as number, lng: focused!.lng as number }
+  const hasSelectedCoords = selected?.lat != null && selected?.lng != null;
+  const mapCenter = hasSelectedCoords
+    ? { lat: selected!.lat as number, lng: selected!.lng as number }
     : OVERVIEW_CENTER;
 
   return (
@@ -211,8 +191,8 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
               <KakaoMapView
                 markers={markers}
                 center={mapCenter}
-                level={hasFocusedCoords ? 4 : OVERVIEW_LEVEL}
-                onMarkerClick={openDetail}
+                level={hasSelectedCoords ? 4 : OVERVIEW_LEVEL}
+                onMarkerClick={setSelectedKey}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-neutral-50 text-sm text-neutral-400 dark:bg-neutral-900">
@@ -221,112 +201,98 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {results.map((c, i) => {
-              const key = keyOf(c);
-              const isFocused = focused !== null && keyOf(focused) === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => openDetail(key)}
-                  className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition dark:bg-neutral-950 ${
-                    isFocused ? "" : "border-neutral-200 dark:border-neutral-800"
-                  }`}
-                  style={
-                    isFocused
-                      ? { borderColor: chartColors.series1Blue, boxShadow: `0 0 0 1px ${chartColors.series1Blue}` }
-                      : undefined
-                  }
-                >
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <RankBadge rank={i + 1} />
-                      <div className="min-w-0">
-                        <p className="truncate font-serif text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-                          {c.complexName}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
+            <div className="flex flex-col gap-3">
+              {results.map((c, i) => {
+                const key = keyOf(c);
+                const isSelected = selected !== null && keyOf(selected) === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setSelectedKey(key)}
+                    className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition dark:bg-neutral-950 ${
+                      isSelected ? "" : "border-neutral-200 dark:border-neutral-800"
+                    }`}
+                    style={
+                      isSelected
+                        ? { borderColor: chartColors.series1Blue, boxShadow: `0 0 0 1px ${chartColors.series1Blue}` }
+                        : undefined
+                    }
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <RankBadge rank={i + 1} />
+                        <div className="min-w-0">
+                          <p className="truncate font-serif text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+                            {c.complexName}
+                          </p>
+                          <p className="text-xs text-neutral-400">{c.districtNameKo}</p>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-lg font-bold" style={{ color: chartColors.series1Blue }}>
+                          {c.recommendScore}
                         </p>
-                        <p className="text-xs text-neutral-400">{c.districtNameKo}</p>
+                        <p className="text-[10px] text-neutral-400">종합점수</p>
                       </div>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-lg font-bold" style={{ color: chartColors.series1Blue }}>
-                        {c.recommendScore}
-                      </p>
-                      <p className="text-[10px] text-neutral-400">종합점수</p>
+
+                    <div className="mb-3 space-y-2">
+                      <ScoreBar label="직주근접" value={c.jobProximityScore} color={chartColors.series1Blue} />
+                      <ScoreBar label="가격 저렴함" value={c.affordabilityScore} color={chartColors.series2Orange} />
+                      <ScoreBar label="저평가(상승률 낮음)" value={c.undervaluationScore} color={chartColors.series3Aqua} />
                     </div>
-                  </div>
 
-                  <div className="mb-3 space-y-2">
-                    <ScoreBar label="직주근접" value={c.jobProximityScore} color={chartColors.series1Blue} />
-                    <ScoreBar label="가격 저렴함" value={c.affordabilityScore} color={chartColors.series2Orange} />
-                    <ScoreBar label="저평가(상승률 낮음)" value={c.undervaluationScore} color={chartColors.series3Aqua} />
-                  </div>
-
-                  {c.reasons[0] && (
-                    <p className="mb-3 flex gap-1 text-xs text-neutral-500 dark:text-neutral-400">
-                      <span style={{ color: chartColors.series1Blue }}>▸</span>
-                      {c.reasons[0]}
-                    </p>
-                  )}
-
-                  <div className="mb-3 grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-lg bg-neutral-50 py-1.5 dark:bg-neutral-900">
-                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                        {c.latestAvgPricePerPyeong ? `${c.latestAvgPricePerPyeong.toLocaleString()}만원` : "-"}
+                    {c.reasons[0] && (
+                      <p className="flex gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+                        <span style={{ color: chartColors.series1Blue }}>▸</span>
+                        {c.reasons[0]}
                       </p>
-                      <p className="text-[10px] text-neutral-400">평당가</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="lg:sticky lg:top-4">
+              {selected && (
+                <div key={keyOf(selected)} className="panel-enter space-y-4">
+                  <ComplexDetailPanel
+                    complex={selected}
+                    districtNameKo={selected.districtNameKo}
+                    reasons={selected.reasons}
+                    onClose={() => setSelectedKey(results[0] ? keyOf(results[0]) : null)}
+                  />
+                  <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+                    <div className="mb-3 grid grid-cols-2 gap-2 text-center">
+                      <div className="rounded-lg bg-neutral-50 py-1.5 dark:bg-neutral-900">
+                        <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                          {selected.latestAvgPricePerPyeong
+                            ? `${selected.latestAvgPricePerPyeong.toLocaleString()}만원`
+                            : "-"}
+                        </p>
+                        <p className="text-[10px] text-neutral-400">평당가</p>
+                      </div>
+                      <div className="rounded-lg bg-neutral-50 py-1.5 dark:bg-neutral-900">
+                        <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                          {selected.latestAvgPriceTotal
+                            ? `${(selected.latestAvgPriceTotal / 10000).toLocaleString(undefined, { maximumFractionDigits: 1 })}억원`
+                            : "-"}
+                        </p>
+                        <p className="text-[10px] text-neutral-400">평균 실거래가</p>
+                      </div>
                     </div>
-                    <div className="rounded-lg bg-neutral-50 py-1.5 dark:bg-neutral-900">
-                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                        {c.latestAvgPriceTotal
-                          ? `${(c.latestAvgPriceTotal / 10000).toLocaleString(undefined, { maximumFractionDigits: 1 })}억원`
-                          : "-"}
-                      </p>
-                      <p className="text-[10px] text-neutral-400">평균 실거래가</p>
-                    </div>
+                    <Link
+                      href={`/district/${selected.districtId}`}
+                      className="text-xs font-medium hover:underline"
+                      style={{ color: chartColors.series1Blue }}
+                    >
+                      {selected.districtNameKo} 지구 상세 보기 →
+                    </Link>
                   </div>
-
-                  <p className="mb-3 text-xs text-neutral-400">
-                    {c.nearestSubwayName
-                      ? `${c.nearestSubwayName}역 ${c.nearestSubwayDistanceM?.toLocaleString()}m`
-                      : "지하철역 정보 없음"}
-                    {" · "}
-                    {c.distanceToDistrictM !== null
-                      ? `${c.districtNameKo}업무지구 ${(c.distanceToDistrictM / 1000).toFixed(1)}km`
-                      : "거리 정보 없음"}
-                  </p>
-
-                  <Link
-                    href={`/district/${c.districtId}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-xs font-medium hover:underline"
-                    style={{ color: chartColors.series1Blue }}
-                  >
-                    {c.districtNameKo} 지구 상세 보기 →
-                  </Link>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {openComplex && (
-        <>
-          <div
-            className="backdrop-enter fixed inset-0 z-40 bg-black/40"
-            onClick={() => setOpenKey(null)}
-          />
-          <div className="sheet-enter fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl dark:bg-neutral-950">
-            <div className="mx-auto w-full max-w-2xl p-4 pb-6 sm:p-6">
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-neutral-200 dark:bg-neutral-700" />
-              <ComplexDetailPanel
-                complex={openComplex}
-                districtNameKo={openComplex.districtNameKo}
-                reasons={openComplex.reasons}
-                onClose={() => setOpenKey(null)}
-              />
+                </div>
+              )}
             </div>
           </div>
         </>
