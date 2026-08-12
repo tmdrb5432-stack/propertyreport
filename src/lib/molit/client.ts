@@ -1,5 +1,8 @@
-const MOLIT_BASE =
-  "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
+// getRTMSDataSvcAptTradeDev ("상세" variant) requires a separate 활용신청
+// from the basic getRTMSDataSvcAptTrade — the user's key is only approved
+// for the basic one, so that's what we call. Same core fields (aptNm,
+// umdNm, dealAmount, excluUseAr, dealYear/Month/Day, buildYear).
+const MOLIT_BASE = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade";
 const ROWS_PER_PAGE = 1000;
 const MAX_PAGES = 5; // 5,000 trades/month/sigungu ceiling — generous for any single gu.
 
@@ -68,7 +71,7 @@ function extractTotalCount(xml: string): number {
 }
 
 /**
- * 국토교통부 아파트매매 실거래자료 (getRTMSDataSvcAptTradeDev) for one
+ * 국토교통부 아파트매매 실거래자료 (getRTMSDataSvcAptTrade) for one
  * sigungu (LAWD_CD, 5-digit) and one deal month (YYYYMM). Paginates until
  * all rows for the month are collected.
  */

@@ -10,7 +10,7 @@ const PROPERTY_TYPE = "아파트";
 
 /**
  * Real adapter for 국토교통부 아파트 실거래가 (공공데이터포털,
- * getRTMSDataSvcAptTradeDev). Fetches 6 months of trades for the district's
+ * getRTMSDataSvcAptTrade). Fetches 6 months of trades for the district's
  * sigungu (LAWD_CD), keeps only trades within PROXIMITY_RADIUS_M of the
  * district center (via fetchDistrictTrades' Kakao-geocode filter), and
  * aggregates per month across all qualifying complexes.
