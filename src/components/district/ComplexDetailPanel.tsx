@@ -1,0 +1,65 @@
+import type { TopComplex } from "@/lib/queries";
+import { ComplexTradeTable } from "@/components/district/ComplexTradeTable";
+import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
+
+function formatMonth(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function ComplexDetailPanel({
+  complex,
+  districtNameKo,
+  onClose,
+}: {
+  complex: TopComplex;
+  districtNameKo: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-md ring-1 ring-neutral-900/5 dark:border-neutral-800 dark:bg-neutral-950">
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+          {complex.complexName}
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="닫고 주요회사로 돌아가기"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+          {complex.nearestSubwayName
+            ? `${complex.nearestSubwayName}역까지 ${complex.nearestSubwayDistanceM?.toLocaleString()}m`
+            : "인근 지하철역 정보 없음"}
+        </span>
+        <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+          {districtNameKo}업무지구까지{" "}
+          {complex.distanceToDistrictM !== null
+            ? `${(complex.distanceToDistrictM / 1000).toFixed(1)}km · 약 ${complex.estimatedMinutesToDistrict}분 (직선거리 추정)`
+            : "거리 정보 없음"}
+        </span>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-medium text-neutral-500">실거래가 추이</p>
+        <TransactionTrendChart
+          data={complex.trend.map((t) => ({
+            periodDate: formatMonth(t.periodDate),
+            avgPricePerPyeong: t.avgPricePerPyeong,
+            transactionCount: t.transactionCount,
+          }))}
+        />
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-medium text-neutral-500">실거래 현황 (평수별)</p>
+        <ComplexTradeTable trades={complex.recentTrades} />
+      </div>
+    </div>
+  );
+}
