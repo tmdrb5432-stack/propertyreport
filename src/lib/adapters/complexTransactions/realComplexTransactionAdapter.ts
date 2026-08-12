@@ -45,6 +45,7 @@ export class RealComplexTransactionAdapter
         raw: groupTrades
           .map((t) => ({
             dealDate: t.dealDate.toISOString(),
+            areaM2: Math.round(t.areaM2 * 100) / 100,
             areaPyeong: Math.round(t.areaPyeong * 10) / 10,
             pricePerPyeong: Math.round(t.pricePerPyeong),
             priceTotal: t.priceTotal,

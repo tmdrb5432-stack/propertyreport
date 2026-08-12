@@ -4,6 +4,12 @@ import { computeJobHousingIndex } from "@/lib/scoring/jobHousingIndex";
 import { computeMobilityIndex } from "@/lib/scoring/mobilityIndex";
 import { getDistrictFreshness, type FreshnessInfo } from "@/lib/freshness";
 import type { ComplexTradeRecord, NotableCompany } from "@/lib/adapters/types";
+import { haversineM } from "@/lib/geo";
+
+// Straight-line-distance heuristic, not a real routing estimate — no
+// directions/routing API is wired up. ~20km/h approximates a mixed
+// walk+transit+driving pace across these dense business districts.
+const ESTIMATED_KMH = 20;
 
 export interface DistrictOverview {
   id: string;
@@ -213,9 +219,13 @@ export interface TopComplex {
   recentTrades: ComplexTradeRecord[];
   lat: number | null;
   lng: number | null;
+  nearestSubwayName: string | null;
+  nearestSubwayDistanceM: number | null;
+  distanceToDistrictM: number | null;
+  estimatedMinutesToDistrict: number | null;
 }
 
-const RECENT_TRADES_LIMIT = 30;
+const RECENT_TRADES_LIMIT = 60;
 
 function parseTradeRecords(raw: unknown): ComplexTradeRecord[] {
   if (!Array.isArray(raw)) return [];
@@ -224,6 +234,7 @@ function parseTradeRecords(raw: unknown): ComplexTradeRecord[] {
       r !== null &&
       typeof r === "object" &&
       typeof (r as ComplexTradeRecord).dealDate === "string" &&
+      typeof (r as ComplexTradeRecord).areaM2 === "number" &&
       typeof (r as ComplexTradeRecord).areaPyeong === "number" &&
       typeof (r as ComplexTradeRecord).priceTotal === "number",
   );
@@ -238,7 +249,7 @@ function parseTradeRecords(raw: unknown): ComplexTradeRecord[] {
  */
 export async function getTopComplexesForDistrict(
   districtId: string,
-  limit = 3,
+  limit = 5,
 ): Promise<TopComplex[]> {
   const rows = await prisma.complexTransactionSnapshot.findMany({
     where: { districtId, propertyType: "아파트" },
@@ -260,7 +271,10 @@ export async function getTopComplexesForDistrict(
     else byComplex.set(row.complexName, [row]);
   }
 
-  const complexes: Omit<TopComplex, "lat" | "lng">[] = [];
+  const complexes: Omit<
+    TopComplex,
+    "lat" | "lng" | "nearestSubwayName" | "nearestSubwayDistanceM" | "distanceToDistrictM" | "estimatedMinutesToDistrict"
+  >[] = [];
   for (const [complexName, history] of byComplex) {
     const latest = history[history.length - 1];
     if (latest.avgPricePerPyeong === null) continue;
@@ -292,9 +306,11 @@ export async function getTopComplexesForDistrict(
   const top = complexes.slice(0, limit);
   if (top.length === 0) return [];
 
-  // Coordinates are resolved+cached by the update-complex-transactions cron
-  // (via resolveComplexLocations), so this is a plain cache read — no Kakao
-  // calls happen during page render.
+  const district = DISTRICTS.find((d) => d.id === districtId);
+
+  // Coordinates + nearest subway are resolved+cached by the
+  // update-complex-transactions cron (via resolveComplexLocations), so this
+  // is a plain cache read — no Kakao calls happen during page render.
   const locations = await prisma.complexLocationCache.findMany({
     where: { districtId, complexName: { in: top.map((c) => c.complexName) } },
   });
@@ -302,6 +318,24 @@ export async function getTopComplexesForDistrict(
 
   return top.map((c) => {
     const loc = locationByName.get(c.complexName);
-    return { ...c, lat: loc?.lat ?? null, lng: loc?.lng ?? null };
+    const lat = loc?.lat ?? null;
+    const lng = loc?.lng ?? null;
+    const distanceToDistrictM =
+      lat !== null && lng !== null && district
+        ? Math.round(haversineM({ lat, lng }, { lat: district.lat, lng: district.lng }))
+        : null;
+
+    return {
+      ...c,
+      lat,
+      lng,
+      nearestSubwayName: loc?.nearestSubwayName ?? null,
+      nearestSubwayDistanceM: loc?.nearestSubwayDistanceM ?? null,
+      distanceToDistrictM,
+      estimatedMinutesToDistrict:
+        distanceToDistrictM !== null
+          ? Math.max(1, Math.round((distanceToDistrictM / 1000 / ESTIMATED_KMH) * 60))
+          : null,
+    };
   });
 }

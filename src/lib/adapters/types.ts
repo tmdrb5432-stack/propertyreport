@@ -48,6 +48,7 @@ export interface TransactionSnapshotInput {
 // (평수 + 실거래금액), not just the monthly aggregate.
 export interface ComplexTradeRecord {
   dealDate: string; // ISO date string
+  areaM2: number;
   areaPyeong: number;
   pricePerPyeong: number;
   priceTotal: number; // 만원
