@@ -72,7 +72,7 @@ export function DistrictSummaryCard({ district }: { district: DistrictOverview }
         </div>
         <div className="rounded-lg bg-neutral-50 py-2 dark:bg-neutral-900">
           <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-            {district.employeeCount ?? "추정치 없음"}
+            {district.employeeCount ? district.employeeCount.toLocaleString() : "추정치 없음"}
           </p>
           <p className="text-[11px] text-neutral-400">종사자수(추정)</p>
         </div>

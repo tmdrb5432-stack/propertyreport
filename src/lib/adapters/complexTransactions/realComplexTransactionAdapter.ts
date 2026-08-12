@@ -42,7 +42,14 @@ export class RealComplexTransactionAdapter
         medianPriceTotal: Math.round(median(totals)),
         transactionCount: groupTrades.length,
         propertyType: PROPERTY_TYPE,
-        raw: null,
+        raw: groupTrades
+          .map((t) => ({
+            dealDate: t.dealDate.toISOString(),
+            areaPyeong: Math.round(t.areaPyeong * 10) / 10,
+            pricePerPyeong: Math.round(t.pricePerPyeong),
+            priceTotal: t.priceTotal,
+          }))
+          .sort((a, b) => b.dealDate.localeCompare(a.dealDate)),
       });
     }
 

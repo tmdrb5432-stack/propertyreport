@@ -3,7 +3,7 @@ import { DISTRICTS } from "@/lib/districts";
 import { computeJobHousingIndex } from "@/lib/scoring/jobHousingIndex";
 import { computeMobilityIndex } from "@/lib/scoring/mobilityIndex";
 import { getDistrictFreshness, type FreshnessInfo } from "@/lib/freshness";
-import type { NotableCompany } from "@/lib/adapters/types";
+import type { ComplexTradeRecord, NotableCompany } from "@/lib/adapters/types";
 
 export interface DistrictOverview {
   id: string;
@@ -210,8 +210,23 @@ export interface TopComplex {
   latestAvgPriceTotal: number | null;
   latestTransactionCount: number;
   trend: ComplexTransactionPoint[];
+  recentTrades: ComplexTradeRecord[];
   lat: number | null;
   lng: number | null;
+}
+
+const RECENT_TRADES_LIMIT = 30;
+
+function parseTradeRecords(raw: unknown): ComplexTradeRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (r): r is ComplexTradeRecord =>
+      r !== null &&
+      typeof r === "object" &&
+      typeof (r as ComplexTradeRecord).dealDate === "string" &&
+      typeof (r as ComplexTradeRecord).areaPyeong === "number" &&
+      typeof (r as ComplexTradeRecord).priceTotal === "number",
+  );
 }
 
 /**
@@ -234,6 +249,7 @@ export async function getTopComplexesForDistrict(
       avgPricePerPyeong: true,
       avgPriceTotal: true,
       transactionCount: true,
+      raw: true,
     },
   });
 
@@ -248,6 +264,12 @@ export async function getTopComplexesForDistrict(
   for (const [complexName, history] of byComplex) {
     const latest = history[history.length - 1];
     if (latest.avgPricePerPyeong === null) continue;
+
+    const recentTrades = history
+      .flatMap((h) => parseTradeRecords(h.raw))
+      .sort((a, b) => b.dealDate.localeCompare(a.dealDate))
+      .slice(0, RECENT_TRADES_LIMIT);
+
     complexes.push({
       complexName,
       latestPeriodDate: latest.periodDate,
@@ -259,6 +281,7 @@ export async function getTopComplexesForDistrict(
         avgPricePerPyeong: h.avgPricePerPyeong,
         transactionCount: h.transactionCount,
       })),
+      recentTrades,
     });
   }
 

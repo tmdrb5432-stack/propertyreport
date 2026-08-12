@@ -14,6 +14,29 @@ import { estimateEmployeeCount } from "@/lib/companySize";
 const COMPANY_QUERIES = ["기업", "본사", "오피스"];
 const NOTABLE_COMPANY_LIMIT = 10;
 
+// Keyword search for "기업"/"본사"/"오피스" pulls in obvious false positives —
+// convenience stores, parking lots, restaurants near an office building, etc.
+// whose name or listing happens to match. category_group_code is Kakao's
+// closest thing to a type filter; exclude the categories that are clearly
+// never a company/employer even though they have no dedicated "office" code.
+const EXCLUDED_CATEGORY_GROUP_CODES = new Set([
+  "CS2", // 편의점
+  "PK6", // 주차장
+  "MT1", // 대형마트
+  "FD6", // 음식점
+  "CE7", // 카페
+  "HP8", // 병원
+  "PM9", // 약국
+  "OL7", // 주유소,충전소
+  "SW8", // 지하철역
+  "AT4", // 관광명소
+  "AD5", // 숙박
+  "CT1", // 문화시설
+  "PS3", // 어린이집,유치원
+  "SC4", // 학교
+  "AC5", // 학원
+]);
+
 async function resolveEmployeeCount(
   doc: KakaoDocument,
   corpNameIndex: Awaited<ReturnType<typeof loadCorpNameIndex>>,
@@ -55,6 +78,7 @@ export class KakaoCompanyAdapter
     const seen = new Map<string, KakaoDocument>();
     for (const docs of resultsByQuery) {
       for (const doc of docs) {
+        if (EXCLUDED_CATEGORY_GROUP_CODES.has(doc.category_group_code)) continue;
         if (!seen.has(doc.id)) seen.set(doc.id, doc);
       }
     }

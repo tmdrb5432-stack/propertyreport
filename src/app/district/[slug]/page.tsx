@@ -88,7 +88,9 @@ export default async function DistrictDetailPage({
                 <p className="text-[11px] text-neutral-400">회사수</p>
               </div>
               <div>
-                <p className="text-lg font-semibold">{district.employeeCount ?? "추정불가"}</p>
+                <p className="text-lg font-semibold">
+                  {district.employeeCount ? district.employeeCount.toLocaleString() : "추정불가"}
+                </p>
                 <p className="text-[11px] text-neutral-400">종사자수(추정)</p>
               </div>
             </div>
