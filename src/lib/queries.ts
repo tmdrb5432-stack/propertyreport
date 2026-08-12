@@ -435,6 +435,55 @@ export interface RecommendedComplex extends TopComplex {
   undervaluationScore: number;
   /** jobProximityScore*0.4 + affordabilityScore*0.3 + undervaluationScore*0.3 */
   recommendScore: number;
+  /** 2-3 short reasons this ranked well, strongest first, each grounded in an actual number rather than restating the score. */
+  reasons: string[];
+}
+
+function buildRecommendReasons(c: {
+  districtNameKo: string;
+  jobProximityScore: number;
+  affordabilityScore: number;
+  undervaluationScore: number;
+  nearestSubwayName: string | null;
+  nearestSubwayDistanceM: number | null;
+  distanceToDistrictM: number | null;
+  latestAvgPricePerPyeong: number | null;
+}): string[] {
+  const proximityBits: string[] = [];
+  if (c.nearestSubwayName && c.nearestSubwayDistanceM !== null) {
+    proximityBits.push(`${c.nearestSubwayName}역 ${c.nearestSubwayDistanceM.toLocaleString()}m`);
+  }
+  if (c.distanceToDistrictM !== null) {
+    proximityBits.push(`${c.districtNameKo}업무지구 ${(c.distanceToDistrictM / 1000).toFixed(1)}km`);
+  }
+
+  const priceText = c.latestAvgPricePerPyeong ? `${c.latestAvgPricePerPyeong.toLocaleString()}만원` : "가격 정보 없음";
+
+  const candidates = [
+    {
+      score: c.jobProximityScore,
+      text:
+        c.jobProximityScore >= 60
+          ? `직주근접 ${c.jobProximityScore}점으로 상위권${proximityBits.length ? ` — ${proximityBits.join(" · ")}` : ""}`
+          : `직주근접 ${c.jobProximityScore}점${proximityBits.length ? ` (${proximityBits.join(" · ")})` : ""}`,
+    },
+    {
+      score: c.affordabilityScore,
+      text:
+        c.affordabilityScore >= 60
+          ? `같은 후보군 중 평당가가 저렴한 편 (${priceText})`
+          : `평당가 ${priceText}, 후보군 중 평균 수준`,
+    },
+    {
+      score: c.undervaluationScore,
+      text:
+        c.undervaluationScore >= 60
+          ? "최근 6개월 상승률이 낮아 아직 저평가 구간으로 보임"
+          : "최근 6개월 상승률은 후보군 중 평균 수준",
+    },
+  ];
+
+  return candidates.sort((a, b) => b.score - a.score).map((r) => r.text);
 }
 
 /**
@@ -478,7 +527,17 @@ export async function getRecommendedComplexes(): Promise<RecommendedComplex[]> {
       const recommendScore = Math.round(
         c.jobProximityScore * 0.4 + affordabilityScore * 0.3 + undervaluationScore * 0.3,
       );
-      return { ...c, affordabilityScore, undervaluationScore, recommendScore };
+      const reasons = buildRecommendReasons({
+        districtNameKo: c.districtNameKo,
+        jobProximityScore: c.jobProximityScore,
+        affordabilityScore,
+        undervaluationScore,
+        nearestSubwayName: c.nearestSubwayName,
+        nearestSubwayDistanceM: c.nearestSubwayDistanceM,
+        distanceToDistrictM: c.distanceToDistrictM,
+        latestAvgPricePerPyeong: c.latestAvgPricePerPyeong,
+      });
+      return { ...c, affordabilityScore, undervaluationScore, recommendScore, reasons };
     })
     .sort((a, b) => b.recommendScore - a.recommendScore);
 }
