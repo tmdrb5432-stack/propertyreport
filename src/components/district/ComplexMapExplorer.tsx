@@ -27,6 +27,7 @@ export function ComplexMapExplorer({
       lat: complex.lat as number,
       lng: complex.lng as number,
       label: `${rank}. ${complex.complexName}`,
+      rank,
     }));
 
   const selectedComplex = complexes.find((c) => c.complexName === selected) ?? null;

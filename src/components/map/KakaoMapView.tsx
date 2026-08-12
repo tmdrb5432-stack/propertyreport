@@ -1,15 +1,21 @@
 "use client";
 
-import { Map, MapMarker, useKakaoLoader } from "react-kakao-maps-sdk";
+import { CustomOverlayMap, Map, MapMarker, useKakaoLoader } from "react-kakao-maps-sdk";
 import { MapPlaceholder } from "./MapPlaceholder";
+import { chartColors } from "@/lib/chartTheme";
 
 const KAKAO_JS_KEY = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
+
+// Matches RankBadge's gold/silver/bronze accent for 1st-3rd, neutral after.
+const RANK_MARKER_COLORS = ["#eda100", "#898781", "#b08d57"];
 
 export interface MapMarkerData {
   id: string;
   lat: number;
   lng: number;
   label: string;
+  /** When set, renders a numbered badge pin instead of the default marker — for ranked results (e.g. TOP5). */
+  rank?: number;
 }
 
 interface KakaoMapViewProps {
@@ -47,14 +53,33 @@ function LoadedMap({ markers, center, level, onMarkerClick }: KakaoMapViewProps)
       level={level ?? 8}
       style={{ width: "100%", height: "100%", minHeight: 240, borderRadius: 12 }}
     >
-      {markers.map((marker) => (
-        <MapMarker
-          key={marker.id}
-          position={{ lat: marker.lat, lng: marker.lng }}
-          title={marker.label}
-          onClick={() => onMarkerClick?.(marker.id)}
-        />
-      ))}
+      {markers.map((marker) =>
+        marker.rank !== undefined ? (
+          <CustomOverlayMap
+            key={marker.id}
+            position={{ lat: marker.lat, lng: marker.lng }}
+            yAnchor={1}
+            clickable
+          >
+            <button
+              type="button"
+              title={marker.label}
+              onClick={() => onMarkerClick?.(marker.id)}
+              className="flex h-7 w-7 -translate-y-1 cursor-pointer items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow-md"
+              style={{ background: RANK_MARKER_COLORS[marker.rank - 1] ?? chartColors.mutedInk }}
+            >
+              {marker.rank}
+            </button>
+          </CustomOverlayMap>
+        ) : (
+          <MapMarker
+            key={marker.id}
+            position={{ lat: marker.lat, lng: marker.lng }}
+            title={marker.label}
+            onClick={() => onMarkerClick?.(marker.id)}
+          />
+        ),
+      )}
     </Map>
   );
 }
