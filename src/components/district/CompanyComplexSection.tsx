@@ -9,6 +9,8 @@ import { ComplexMapExplorer } from "@/components/district/ComplexMapExplorer";
 import { ComplexDetailPanel } from "@/components/district/ComplexDetailPanel";
 import { chartColors } from "@/lib/chartTheme";
 
+const COMPANY_MARKER_PREFIX = "__company__:";
+
 export function CompanyComplexSection({
   district,
   companies,
@@ -20,17 +22,40 @@ export function CompanyComplexSection({
   complexes: TopComplex[];
   isRealTransactionData: boolean;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const selectedComplex = complexes.find((c) => c.complexName === selected) ?? null;
+  const [selectedComplex, setSelectedComplex] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const activeComplex = complexes.find((c) => c.complexName === selectedComplex) ?? null;
+  const activeCompany = companies.find((c) => c.name === selectedCompany) ?? null;
+
+  function handleMapMarkerClick(id: string) {
+    if (id.startsWith(COMPANY_MARKER_PREFIX)) return; // already focused, nothing to do
+    setSelectedCompany(null);
+    setSelectedComplex(id);
+  }
+
+  function handleCompanySelect(name: string) {
+    setSelectedComplex(null);
+    setSelectedCompany(name);
+  }
+
+  const focusMarker =
+    activeCompany && activeCompany.lat !== null && activeCompany.lng !== null
+      ? {
+          id: `${COMPANY_MARKER_PREFIX}${activeCompany.name}`,
+          lat: activeCompany.lat,
+          lng: activeCompany.lng,
+          label: activeCompany.name,
+        }
+      : null;
 
   return (
     <section className="mb-8 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
       <div>
-        {selectedComplex ? (
+        {activeComplex ? (
           <ComplexDetailPanel
-            complex={selectedComplex}
+            complex={activeComplex}
             districtNameKo={district.nameKo}
-            onClose={() => setSelected(null)}
+            onClose={() => setSelectedComplex(null)}
           />
         ) : (
           <>
@@ -38,7 +63,11 @@ export function CompanyComplexSection({
               주요회사 <span className="font-normal text-neutral-400">(참고용)</span>
             </SectionHeading>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-              <CompanyList companies={companies} />
+              <CompanyList
+                companies={companies}
+                selected={selectedCompany}
+                onSelect={handleCompanySelect}
+              />
             </div>
           </>
         )}
@@ -55,8 +84,9 @@ export function CompanyComplexSection({
           <ComplexMapExplorer
             district={district}
             complexes={complexes}
-            selected={selected}
-            onSelect={setSelected}
+            selected={selectedComplex}
+            onSelect={handleMapMarkerClick}
+            focusMarker={focusMarker}
           />
         </div>
       </div>
