@@ -122,6 +122,7 @@ export interface DistrictDetail {
     avgPricePerPyeong: number | null;
     transactionCount: number;
   }[];
+  transactionSource: string | null;
   askingPrices: {
     periodDate: Date;
     avgAskingPricePerPyeong: number | null;
@@ -155,7 +156,7 @@ export async function getDistrictDetail(
       prisma.transactionSnapshot.findMany({
         where: { districtId },
         orderBy: { periodDate: "asc" },
-        select: { periodDate: true, avgPricePerPyeong: true, transactionCount: true },
+        select: { periodDate: true, avgPricePerPyeong: true, transactionCount: true, source: true },
       }),
       prisma.askingPriceSnapshot.findMany({
         where: { districtId },
@@ -188,7 +189,8 @@ export async function getDistrictDetail(
     subwayLines: (transit?.subwayLines as string[] | undefined) ?? [],
     subwayStationCount: transit?.subwayStationCount ?? null,
     busStopCount: transit?.busStopCount ?? null,
-    transactions,
+    transactions: transactions.map(({ source: _source, ...t }) => t),
+    transactionSource: transactions.length > 0 ? transactions[transactions.length - 1].source : null,
     askingPrices,
     migrations,
     freshness,
@@ -208,6 +210,8 @@ export interface TopComplex {
   latestAvgPriceTotal: number | null;
   latestTransactionCount: number;
   trend: ComplexTransactionPoint[];
+  lat: number | null;
+  lng: number | null;
 }
 
 /**
@@ -240,7 +244,7 @@ export async function getTopComplexesForDistrict(
     else byComplex.set(row.complexName, [row]);
   }
 
-  const complexes: TopComplex[] = [];
+  const complexes: Omit<TopComplex, "lat" | "lng">[] = [];
   for (const [complexName, history] of byComplex) {
     const latest = history[history.length - 1];
     if (latest.avgPricePerPyeong === null) continue;
@@ -262,5 +266,19 @@ export async function getTopComplexesForDistrict(
     (a, b) => (b.latestAvgPricePerPyeong ?? 0) - (a.latestAvgPricePerPyeong ?? 0),
   );
 
-  return complexes.slice(0, limit);
+  const top = complexes.slice(0, limit);
+  if (top.length === 0) return [];
+
+  // Coordinates are resolved+cached by the update-complex-transactions cron
+  // (via resolveComplexLocations), so this is a plain cache read — no Kakao
+  // calls happen during page render.
+  const locations = await prisma.complexLocationCache.findMany({
+    where: { districtId, complexName: { in: top.map((c) => c.complexName) } },
+  });
+  const locationByName = new Map(locations.map((l) => [l.complexName, l]));
+
+  return top.map((c) => {
+    const loc = locationByName.get(c.complexName);
+    return { ...c, lat: loc?.lat ?? null, lng: loc?.lng ?? null };
+  });
 }

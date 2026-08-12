@@ -162,3 +162,19 @@ model DartEmployeeCache {
   reprtCode     String
   fetchedAt     DateTime @default(now())
 }
+
+// Read-through cache mapping an apartment complex name to map coordinates
+// (resolved via Kakao keyword search, biased near the district center).
+// Populated by the complex-transaction cron for both mock and real sources
+// so the district map can plot TOP3 markers without geocoding on every page
+// render; also consulted by the real MOLIT adapters to filter individual
+// trades down to the district's 5km radius.
+model ComplexLocationCache {
+  districtId  String
+  complexName String
+  lat         Float?
+  lng         Float?
+  resolvedAt  DateTime @default(now())
+
+  @@id([districtId, complexName])
+}

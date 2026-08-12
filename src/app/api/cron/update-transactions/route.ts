@@ -5,8 +5,10 @@ import { runForEachDistrict } from "@/lib/runUpdate";
 import { transactionAdapter } from "@/lib/adapters/transactions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
-// Daily refresh of 실거래가 snapshots (mock until MOLIT key is configured).
+// Daily refresh of 실거래가 snapshots (mock, or MOLIT real data once
+// TRANSACTION_DATA_SOURCE=real is set).
 export async function GET(request: Request) {
   if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
