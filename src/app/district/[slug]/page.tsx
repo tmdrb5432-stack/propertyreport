@@ -4,7 +4,7 @@ import { getDistrictDetail, getTopComplexesForDistrict } from "@/lib/queries";
 import { KakaoMapView } from "@/components/map/KakaoMapView";
 import { TransitScoreGauge } from "@/components/charts/TransitScoreGauge";
 import { CompanyList } from "@/components/district/CompanyList";
-import { TopComplexList } from "@/components/district/TopComplexList";
+import { ComplexMapExplorer } from "@/components/district/ComplexMapExplorer";
 import { FreshnessRow } from "@/components/district/FreshnessBadge";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
 import { AskingPriceTrendChart } from "@/components/charts/AskingPriceTrendChart";
@@ -45,6 +45,8 @@ export default async function DistrictDetailPage({
     inMigration: m.inMigration,
     outMigration: m.outMigration,
   }));
+
+  const isRealTransactionData = district.transactionSource === "molit";
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
@@ -103,17 +105,23 @@ export default async function DistrictDetailPage({
 
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold text-neutral-600 dark:text-neutral-300">
-          단지별 실거래가 TOP 3 <span className="font-normal text-neutral-400">(mock)</span>
+          단지별 실거래가 TOP 3{" "}
+          <span className="font-normal text-neutral-400">
+            ({isRealTransactionData ? "국토부 실거래 신고 기준" : "mock"}, 반경 5km)
+          </span>
         </h2>
         <div className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
-          <TopComplexList complexes={topComplexes} />
+          <ComplexMapExplorer district={district} complexes={topComplexes} />
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="mb-2 text-sm font-semibold text-neutral-600 dark:text-neutral-300">
-            실거래가 추이 <span className="font-normal text-neutral-400">(mock)</span>
+            실거래가 추이{" "}
+            <span className="font-normal text-neutral-400">
+              ({isRealTransactionData ? "국토부 실거래 신고 기준" : "mock"})
+            </span>
           </h2>
           <TransactionTrendChart data={transactionPoints} />
         </div>

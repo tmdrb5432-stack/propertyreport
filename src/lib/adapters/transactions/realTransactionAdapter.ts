@@ -3,16 +3,17 @@ import type {
   DataSourceAdapter,
   TransactionSnapshotInput,
 } from "@/lib/adapters/types";
-import { NotImplementedError } from "@/lib/adapters/types";
+import { fetchDistrictTrades } from "@/lib/molit/fetchDistrictTrades";
+import { mean, median } from "@/lib/molit/aggregate";
+
+const PROPERTY_TYPE = "아파트";
 
 /**
- * Real adapter for 국토교통부 아파트 실거래가 (공공데이터포털).
- *
- * Not implemented yet — the user does not have a 공공데이터포털 API key.
- * Once obtained (https://www.data.go.kr, "국토교통부_아파트매매 실거래자료"),
- * implement `fetch` to call the MOLIT endpoint and map its response into
- * `TransactionSnapshotInput[]` — the shape below already matches what the
- * dashboard/schema expect, so no other code needs to change.
+ * Real adapter for 국토교통부 아파트 실거래가 (공공데이터포털,
+ * getRTMSDataSvcAptTradeDev). Fetches 6 months of trades for the district's
+ * sigungu (LAWD_CD), keeps only trades within PROXIMITY_RADIUS_M of the
+ * district center (via fetchDistrictTrades' Kakao-geocode filter), and
+ * aggregates per month across all qualifying complexes.
  */
 export class RealTransactionAdapter
   implements DataSourceAdapter<TransactionSnapshotInput[]>
@@ -20,10 +21,33 @@ export class RealTransactionAdapter
   readonly sourceName = "molit";
   readonly cadence = "daily" as const;
 
-  async fetch(_district: DistrictConfig): Promise<TransactionSnapshotInput[]> {
-    throw new NotImplementedError(
-      "RealTransactionAdapter requires a MOLIT_REALTRANSACTION_API_KEY (공공데이터포털) which is not configured yet.",
-    );
+  async fetch(district: DistrictConfig): Promise<TransactionSnapshotInput[]> {
+    const trades = await fetchDistrictTrades(district);
+
+    const byMonth = new Map<string, typeof trades>();
+    for (const trade of trades) {
+      const key = trade.periodDate.toISOString();
+      const existing = byMonth.get(key);
+      if (existing) existing.push(trade);
+      else byMonth.set(key, [trade]);
+    }
+
+    const snapshots: TransactionSnapshotInput[] = [];
+    for (const [key, monthTrades] of byMonth) {
+      const pricesPerPyeong = monthTrades.map((t) => t.pricePerPyeong);
+      const totals = monthTrades.map((t) => t.priceTotal);
+      snapshots.push({
+        periodDate: new Date(key),
+        avgPricePerPyeong: Math.round(mean(pricesPerPyeong)),
+        avgPriceTotal: Math.round(mean(totals)),
+        medianPriceTotal: Math.round(median(totals)),
+        transactionCount: monthTrades.length,
+        propertyType: PROPERTY_TYPE,
+        raw: null,
+      });
+    }
+
+    return snapshots;
   }
 }
 

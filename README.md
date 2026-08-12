@@ -19,8 +19,8 @@
 | 교통 환경 (지하철/버스) | **실데이터** (카카오) | `KAKAO_REST_KEY` 필요, 지구 중심 반경 5km(`PROXIMITY_RADIUS_M`) |
 | 회사수 / 주요회사 | **실데이터** (카카오) | 반경 5km, Kakao Local API 페이지네이션 상한(~45건)으로 근사치 |
 | 종사자수 | **상장사는 실데이터(DART), 비상장은 추정치** | OpenDART 매칭 성공 시 실제 직원현황, 실패 시 카테고리 기반 추정 — `DART_API_KEY` 필요 |
-| 실거래가 (지구 단위) | mock (실 API 응답 형태와 동일한 타입) | 공공데이터포털 국토부 실거래가 키 발급 후 `src/lib/adapters/transactions/realTransactionAdapter.ts` 구현 |
-| 실거래가 (단지별 TOP 3) | mock (실 API 응답 형태와 동일한 타입) | 반경 5km 내 단지 기준. `src/lib/adapters/complexTransactions/realComplexTransactionAdapter.ts` 구현 대상 |
+| 실거래가 (지구 단위) | **실데이터/mock 전환 가능** | `MOLIT_API_KEY` + `TRANSACTION_DATA_SOURCE=real` 설정 시 국토교통부 아파트매매 실거래자료(공공데이터포털) 사용 |
+| 실거래가 (단지별 TOP 3 + 지도) | **실데이터/mock 전환 가능** | `MOLIT_API_KEY` + `COMPLEX_TRANSACTION_DATA_SOURCE=real`. 단지 위치는 소스와 무관하게 Kakao로 지오코딩되어 지도에 항상 표시됨 |
 | 호가 | mock (real 경로 미구현) | 공식 API 없음. 크롤링은 대상 사이트 약관 법적 검토 후 별도 진행 |
 | 전입/전출 | mock (실 API 응답 형태와 동일한 타입) | KOSIS Open API 키 발급 후 `src/lib/adapters/migration/realMigrationAdapter.ts` 구현 |
 | 지도 렌더링 | JS 키 있으면 실제 지도, 없으면 안내 placeholder | `NEXT_PUBLIC_KAKAO_JS_KEY` |
@@ -83,16 +83,19 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/upda
 1. **카카오 JavaScript 키**: 카카오 디벨로퍼스 콘솔 > 내 애플리케이션 > 앱 키에서 확인/발급
    후 `NEXT_PUBLIC_KAKAO_JS_KEY`에 설정하고, 플랫폼 > Web에 도메인을 등록하세요.
 2. **실거래가**: [공공데이터포털](https://www.data.go.kr)에서 "국토교통부_아파트매매 실거래자료"
-   API 키 발급 → `src/lib/adapters/transactions/realTransactionAdapter.ts`의 `fetch` 구현 →
-   `.env.local`에 `TRANSACTION_DATA_SOURCE=real` 설정.
+   API 키 발급 → `.env.local`(또는 Vercel 환경변수)에 `MOLIT_API_KEY` 설정 →
+   `TRANSACTION_DATA_SOURCE=real`, `COMPLEX_TRANSACTION_DATA_SOURCE=real` 설정.
+   MOLIT API는 법정동코드(시군구 단위)로 조회되기 때문에, 각 업무지구를 담당 구
+   (`src/lib/molit/lawdCodes.ts`)로 근사한 뒤 Kakao 지오코딩으로 반경 5km 밖 거래를
+   걸러냅니다 — 구 경계와 5km 반경이 정확히 일치하지 않을 수 있음을 참고하세요.
 3. **전입/전출**: [KOSIS Open API](https://kosis.kr/openapi) 키 발급 →
    `src/lib/adapters/migration/realMigrationAdapter.ts`의 `fetch` 구현 →
    `MIGRATION_DATA_SOURCE=real` 설정.
 4. **호가**: 공식 API가 없어 이번 빌드에는 포함하지 않았습니다. 크롤링으로 구현하려면 먼저
    대상 사이트(예: 네이버 부동산)의 이용약관을 검토하세요.
-5. **단지별 실거래가 TOP 3**: 실거래가와 동일한 공공데이터포털 키로
-   `src/lib/adapters/complexTransactions/realComplexTransactionAdapter.ts`의 `fetch`를 구현하고
-   `COMPLEX_TRANSACTION_DATA_SOURCE=real` 설정.
+5. **단지별 실거래가 TOP 3 + 지도**: 위 `MOLIT_API_KEY`로 자동 활성화됩니다 (2번과 동일 키
+   공유). mock 상태에서도 단지 이름이 실제 아파트명이라 Kakao 지오코딩으로 지도에 표시되며,
+   실데이터로 전환하면 실제 신고가 기준으로 TOP3 랭킹이 바뀝니다.
 6. **주요회사 종사자수**: [OpenDART](https://opendart.fss.or.kr)에서 무료 키 발급 →
    `.env.local`에 `DART_API_KEY` 설정 → `seed-dart-corpcodes` 라우트를 한 번 호출해 상장사
    corp code를 채운 뒤 `update-kakao`를 다시 실행하면, 카카오 검색 결과 중 상장사와 이름이
@@ -101,7 +104,8 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/upda
 ## 프로덕션 배포 시 유의사항
 
 - Vercel 프로젝트 환경변수에 `DATABASE_URL`(Postgres), `KAKAO_REST_KEY`,
-  `NEXT_PUBLIC_KAKAO_JS_KEY`(있다면), `DART_API_KEY`(있다면), `CRON_SECRET`을 설정하세요.
+  `NEXT_PUBLIC_KAKAO_JS_KEY`(있다면), `DART_API_KEY`(있다면), `MOLIT_API_KEY`(있다면),
+  `CRON_SECRET`을 설정하세요.
 - `package.json`의 `vercel-build` 스크립트(`prisma migrate deploy && next build`)가 배포마다
   자동으로 마이그레이션을 적용하므로, `DATABASE_URL`만 설정되어 있으면 별도 수동 마이그레이션은
   필요 없습니다.

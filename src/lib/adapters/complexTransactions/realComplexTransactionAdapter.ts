@@ -3,17 +3,15 @@ import type {
   ComplexTransactionSnapshotInput,
   DataSourceAdapter,
 } from "@/lib/adapters/types";
-import { NotImplementedError } from "@/lib/adapters/types";
+import { fetchDistrictTrades } from "@/lib/molit/fetchDistrictTrades";
+import { mean, median } from "@/lib/molit/aggregate";
+
+const PROPERTY_TYPE = "아파트";
 
 /**
  * Real adapter for per-complex 실거래가 (국토교통부 아파트매매 실거래자료).
- *
- * Not implemented yet — same MOLIT key gap as realTransactionAdapter.ts. The
- * real API reports an 아파트명 (apartment complex name) per transaction
- * record, which maps directly onto `complexName` here — once a key is
- * available, implement `fetch` to call MOLIT scoped to each district's
- * ~5km radius (PROXIMITY_RADIUS_M in src/lib/districts.ts) and group/average
- * by 아파트명 per period; no schema/UI changes are needed beyond that.
+ * Same radius-filtered trade set as realTransactionAdapter, grouped by
+ * complex name (아파트명) instead of flattened district-wide.
  */
 export class RealComplexTransactionAdapter
   implements DataSourceAdapter<ComplexTransactionSnapshotInput[]>
@@ -21,12 +19,34 @@ export class RealComplexTransactionAdapter
   readonly sourceName = "molit";
   readonly cadence = "daily" as const;
 
-  async fetch(
-    _district: DistrictConfig,
-  ): Promise<ComplexTransactionSnapshotInput[]> {
-    throw new NotImplementedError(
-      "RealComplexTransactionAdapter requires a MOLIT_REALTRANSACTION_API_KEY (공공데이터포털) which is not configured yet.",
-    );
+  async fetch(district: DistrictConfig): Promise<ComplexTransactionSnapshotInput[]> {
+    const trades = await fetchDistrictTrades(district);
+
+    const byGroup = new Map<string, typeof trades>();
+    for (const trade of trades) {
+      const key = `${trade.complexName}::${trade.periodDate.toISOString()}`;
+      const existing = byGroup.get(key);
+      if (existing) existing.push(trade);
+      else byGroup.set(key, [trade]);
+    }
+
+    const snapshots: ComplexTransactionSnapshotInput[] = [];
+    for (const groupTrades of byGroup.values()) {
+      const pricesPerPyeong = groupTrades.map((t) => t.pricePerPyeong);
+      const totals = groupTrades.map((t) => t.priceTotal);
+      snapshots.push({
+        periodDate: groupTrades[0].periodDate,
+        complexName: groupTrades[0].complexName,
+        avgPricePerPyeong: Math.round(mean(pricesPerPyeong)),
+        avgPriceTotal: Math.round(mean(totals)),
+        medianPriceTotal: Math.round(median(totals)),
+        transactionCount: groupTrades.length,
+        propertyType: PROPERTY_TYPE,
+        raw: null,
+      });
+    }
+
+    return snapshots;
   }
 }
 
