@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDistrictDetail, getTopComplexesForDistrict } from "@/lib/queries";
-import { KakaoMapView } from "@/components/map/KakaoMapView";
 import { TransitScoreGauge } from "@/components/charts/TransitScoreGauge";
 import { CompanyComplexSection } from "@/components/district/CompanyComplexSection";
+import { FocusedCompanyProvider } from "@/components/district/FocusedCompanyContext";
+import { TopDistrictMap } from "@/components/district/TopDistrictMap";
 import { FreshnessRow } from "@/components/district/FreshnessBadge";
 import { SectionHeading } from "@/components/district/SectionHeading";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
@@ -76,56 +77,52 @@ export default async function DistrictDetailPage({
         </div>
       </header>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="h-64 overflow-hidden rounded-2xl border border-neutral-200 shadow-sm dark:border-neutral-800">
-          <KakaoMapView
-            markers={[{ id: district.id, lat: district.lat, lng: district.lng, label: district.nameKo }]}
-            center={{ lat: district.lat, lng: district.lng }}
-            level={6}
-          />
-        </div>
+      <FocusedCompanyProvider>
+        <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <TopDistrictMap district={district} />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-            <TransitScoreGauge
-              score={district.transitScore}
-              label="이동편의성 (교통점수)"
-              color={chartColors.series2Orange}
-            />
-            <p className="mt-3 text-xs text-neutral-400">
-              지하철역 {district.subwayStationCount ?? 0}개
-              {district.subwayLines.length > 0 && ` · ${district.subwayLines.join(", ")}`}
-            </p>
-            <p className="text-xs text-neutral-400">버스정류장 {district.busStopCount ?? 0}개</p>
-          </div>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-            <p className="mb-2 text-xs font-medium" style={{ color: chartColors.series1Blue }}>
-              직주근접 지표
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div>
-                <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
-                  {district.companyCount ?? "-"}
-                </p>
-                <p className="text-[11px] text-neutral-400">회사수</p>
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
-                  {district.employeeCount ? district.employeeCount.toLocaleString() : "추정불가"}
-                </p>
-                <p className="text-[11px] text-neutral-400">종사자수(추정)</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+              <TransitScoreGauge
+                score={district.transitScore}
+                label="이동편의성 (교통점수)"
+                color={chartColors.series2Orange}
+              />
+              <p className="mt-3 text-xs text-neutral-400">
+                지하철역 {district.subwayStationCount ?? 0}개
+                {district.subwayLines.length > 0 && ` · ${district.subwayLines.join(", ")}`}
+              </p>
+              <p className="text-xs text-neutral-400">버스정류장 {district.busStopCount ?? 0}개</p>
+            </div>
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+              <p className="mb-2 text-xs font-medium" style={{ color: chartColors.series1Blue }}>
+                직주근접 지표
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+                    {district.companyCount ?? "-"}
+                  </p>
+                  <p className="text-[11px] text-neutral-400">회사수</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+                    {district.employeeCount ? district.employeeCount.toLocaleString() : "추정불가"}
+                  </p>
+                  <p className="text-[11px] text-neutral-400">종사자수(추정)</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <CompanyComplexSection
-        district={district}
-        companies={district.notableCompanies}
-        complexes={topComplexes}
-        isRealTransactionData={isRealTransactionData}
-      />
+        <CompanyComplexSection
+          district={district}
+          companies={district.notableCompanies}
+          complexes={topComplexes}
+          isRealTransactionData={isRealTransactionData}
+        />
+      </FocusedCompanyProvider>
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-950">

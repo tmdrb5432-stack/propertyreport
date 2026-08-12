@@ -7,9 +7,8 @@ import { SectionHeading } from "@/components/district/SectionHeading";
 import { CompanyList } from "@/components/district/CompanyList";
 import { ComplexMapExplorer } from "@/components/district/ComplexMapExplorer";
 import { ComplexDetailPanel } from "@/components/district/ComplexDetailPanel";
+import { useFocusedCompany } from "@/components/district/FocusedCompanyContext";
 import { chartColors } from "@/lib/chartTheme";
-
-const COMPANY_MARKER_PREFIX = "__company__:";
 
 export function CompanyComplexSection({
   district,
@@ -23,30 +22,18 @@ export function CompanyComplexSection({
   isRealTransactionData: boolean;
 }) {
   const [selectedComplex, setSelectedComplex] = useState<string | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const activeComplex = complexes.find((c) => c.complexName === selectedComplex) ?? null;
-  const activeCompany = companies.find((c) => c.name === selectedCompany) ?? null;
+  const { focusedCompany, setFocusedCompany } = useFocusedCompany();
 
-  function handleMapMarkerClick(id: string) {
-    if (id.startsWith(COMPANY_MARKER_PREFIX)) return; // already focused, nothing to do
-    setSelectedCompany(null);
-    setSelectedComplex(id);
+  function handleComplexSelect(complexName: string) {
+    setFocusedCompany(null); // hands the top map's focus back to the district
+    setSelectedComplex(complexName);
   }
 
-  function handleCompanySelect(name: string) {
+  function handleCompanySelect(companyName: string) {
     setSelectedComplex(null);
-    setSelectedCompany(name);
+    setFocusedCompany(companies.find((c) => c.name === companyName) ?? null);
   }
-
-  const focusMarker =
-    activeCompany && activeCompany.lat !== null && activeCompany.lng !== null
-      ? {
-          id: `${COMPANY_MARKER_PREFIX}${activeCompany.name}`,
-          lat: activeCompany.lat,
-          lng: activeCompany.lng,
-          label: activeCompany.name,
-        }
-      : null;
 
   return (
     <section className="mb-8 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
@@ -60,12 +47,15 @@ export function CompanyComplexSection({
         ) : (
           <>
             <SectionHeading color={chartColors.series1Blue}>
-              주요회사 <span className="font-normal text-neutral-400">(참고용)</span>
+              주요회사{" "}
+              <span className="font-normal text-neutral-400">
+                (참고용 — 클릭하면 위 지도가 이동합니다)
+              </span>
             </SectionHeading>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
               <CompanyList
                 companies={companies}
-                selected={selectedCompany}
+                selected={focusedCompany?.name ?? null}
                 onSelect={handleCompanySelect}
               />
             </div>
@@ -85,8 +75,7 @@ export function CompanyComplexSection({
             district={district}
             complexes={complexes}
             selected={selectedComplex}
-            onSelect={handleMapMarkerClick}
-            focusMarker={focusMarker}
+            onSelect={handleComplexSelect}
           />
         </div>
       </div>
