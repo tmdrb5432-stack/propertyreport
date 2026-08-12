@@ -1,11 +1,41 @@
 import { prisma } from "@/lib/db";
-import { searchKeyword } from "@/lib/adapters/kakao/client";
+import { searchCategory, searchKeyword } from "@/lib/adapters/kakao/client";
+import { haversineM } from "@/lib/geo";
 
 const CONCURRENCY = 16;
+const SUBWAY_CATEGORY_CODE = "SW8";
+const SUBWAY_SEARCH_RADIUS_M = 2000;
 
 export interface LatLng {
   lat: number;
   lng: number;
+}
+
+async function findNearestSubway(
+  loc: LatLng,
+): Promise<{ name: string; distanceM: number } | null> {
+  try {
+    const docs = await searchCategory({
+      categoryGroupCode: SUBWAY_CATEGORY_CODE,
+      x: loc.lng,
+      y: loc.lat,
+      radius: SUBWAY_SEARCH_RADIUS_M,
+    });
+    if (docs.length === 0) return null;
+
+    let nearest = docs[0];
+    let nearestDistance = haversineM(loc, { lat: Number(nearest.y), lng: Number(nearest.x) });
+    for (const doc of docs.slice(1)) {
+      const d = haversineM(loc, { lat: Number(doc.y), lng: Number(doc.x) });
+      if (d < nearestDistance) {
+        nearest = doc;
+        nearestDistance = d;
+      }
+    }
+    return { name: nearest.place_name, distanceM: Math.round(nearestDistance) };
+  } catch {
+    return null;
+  }
 }
 
 async function geocodeOne(
@@ -28,6 +58,8 @@ async function geocodeOne(
     loc = null;
   }
 
+  const subway = loc ? await findNearestSubway(loc) : null;
+
   // Persist immediately rather than batching at the end — on a cold cache
   // with hundreds of complexes, this call can run long enough to hit
   // Vercel's 60s function cap. Saving per-result means a killed invocation
@@ -35,8 +67,20 @@ async function geocodeOne(
   // run only has to geocode what's still missing instead of starting over.
   await prisma.complexLocationCache.upsert({
     where: { districtId_complexName: { districtId, complexName } },
-    update: { lat: loc?.lat ?? null, lng: loc?.lng ?? null },
-    create: { districtId, complexName, lat: loc?.lat ?? null, lng: loc?.lng ?? null },
+    update: {
+      lat: loc?.lat ?? null,
+      lng: loc?.lng ?? null,
+      nearestSubwayName: subway?.name ?? null,
+      nearestSubwayDistanceM: subway?.distanceM ?? null,
+    },
+    create: {
+      districtId,
+      complexName,
+      lat: loc?.lat ?? null,
+      lng: loc?.lng ?? null,
+      nearestSubwayName: subway?.name ?? null,
+      nearestSubwayDistanceM: subway?.distanceM ?? null,
+    },
   });
 
   return loc;

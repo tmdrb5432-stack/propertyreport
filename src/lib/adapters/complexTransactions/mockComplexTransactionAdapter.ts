@@ -11,6 +11,13 @@ import {
 
 const HISTORY_MONTHS = 6;
 const PROPERTY_TYPE = "아파트";
+const PYEONG_M2 = 3.3058;
+
+// Real complexes sell a handful of discrete unit types (e.g. "59타입",
+// "84타입"), not a continuous range — picking from a small fixed set of m2
+// values makes the mock 평수별 grouping actually group multiple trades
+// together instead of every trade being its own singleton group.
+const UNIT_AREA_M2 = [59.9, 74.5, 84.9, 101.4, 114.8];
 
 // Illustrative complex names within each district's ~5km search radius
 // (see PROXIMITY_RADIUS_M in src/lib/districts.ts) — not sourced from any
@@ -47,8 +54,6 @@ export class MockComplexTransactionAdapter
       for (let monthsAgo = HISTORY_MONTHS - 1; monthsAgo >= 0; monthsAgo--) {
         level *= randRange(rng, 0.985, 1.03);
         const avgPricePerPyeong = Math.round(level);
-        const avgPyeongSize = randRange(rng, 24, 34);
-        const avgPriceTotal = Math.round(avgPricePerPyeong * avgPyeongSize);
         const transactionCount = Math.round(randRange(rng, 2, 15));
         const periodDate = monthStart(monthsAgo);
 
@@ -56,18 +61,23 @@ export class MockComplexTransactionAdapter
         // "그 아파트 클릭 -> 실거래 현황" detail view has something to show
         // even without real MOLIT data — same raw shape as the real adapter.
         const trades = Array.from({ length: transactionCount }, () => {
-          const areaPyeong = randRange(rng, 20, 40);
+          const areaM2 = UNIT_AREA_M2[Math.floor(randRange(rng, 0, UNIT_AREA_M2.length))];
+          const areaPyeong = areaM2 / PYEONG_M2;
           const pricePerPyeong = Math.round(avgPricePerPyeong * randRange(rng, 0.9, 1.1));
           const dayOfMonth = Math.max(1, Math.round(randRange(rng, 1, 28)));
           const dealDate = new Date(periodDate);
           dealDate.setUTCDate(dayOfMonth);
           return {
             dealDate: dealDate.toISOString(),
+            areaM2: Math.round(areaM2 * 100) / 100,
             areaPyeong: Math.round(areaPyeong * 10) / 10,
             pricePerPyeong,
             priceTotal: Math.round(pricePerPyeong * areaPyeong),
           };
         }).sort((a, b) => b.dealDate.localeCompare(a.dealDate));
+
+        const totals = trades.map((t) => t.priceTotal);
+        const avgPriceTotal = Math.round(totals.reduce((s, v) => s + v, 0) / totals.length);
 
         snapshots.push({
           periodDate,

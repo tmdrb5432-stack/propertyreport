@@ -3,28 +3,19 @@ import { fetchAptTrades, type MolitTradeRow } from "@/lib/molit/client";
 import { getLawdCode } from "@/lib/molit/lawdCodes";
 import { resolveComplexLocations } from "@/lib/kakao/geocodeComplex";
 import { monthStart } from "@/lib/adapters/transactions/mockTransactionAdapter";
+import { haversineM } from "@/lib/geo";
 
 const HISTORY_MONTHS = 6;
 const PYEONG_M2 = 3.3058;
-const EARTH_RADIUS_M = 6371000;
 
 export interface DistrictTrade {
   complexName: string;
   periodDate: Date; // month bucket, matches mock adapters' monthStart()
   dealDate: Date; // exact contract date, for the per-transaction detail view
+  areaM2: number;
   areaPyeong: number;
   pricePerPyeong: number;
   priceTotal: number; // 만원
-}
-
-function haversineM(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
 function dealYmdMonths(): string[] {
@@ -72,6 +63,7 @@ export async function fetchDistrictTrades(district: DistrictConfig): Promise<Dis
       complexName: row.aptName,
       periodDate,
       dealDate: row.dealDate,
+      areaM2: row.areaM2,
       areaPyeong: row.areaM2 / PYEONG_M2,
       pricePerPyeong: row.dealAmountManwon / (row.areaM2 / PYEONG_M2),
       priceTotal: row.dealAmountManwon,

@@ -107,7 +107,7 @@ export default async function DistrictDetailPage({
 
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold text-neutral-600 dark:text-neutral-300">
-          단지별 실거래가 TOP 3{" "}
+          단지별 실거래가 TOP 5{" "}
           <span className="font-normal text-neutral-400">
             ({isRealTransactionData ? "국토부 실거래 신고 기준" : "mock"}, 반경 5km)
           </span>

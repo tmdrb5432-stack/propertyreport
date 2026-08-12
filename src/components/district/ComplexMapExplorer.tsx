@@ -15,7 +15,7 @@ export function ComplexMapExplorer({
   district,
   complexes,
 }: {
-  district: { lat: number; lng: number };
+  district: { lat: number; lng: number; nameKo: string };
   complexes: TopComplex[];
 }) {
   const [selected, setSelected] = useState<string | null>(complexes[0]?.complexName ?? null);
@@ -35,6 +35,10 @@ export function ComplexMapExplorer({
     }));
 
   const selectedComplex = complexes.find((c) => c.complexName === selected) ?? complexes[0];
+  const hasSelectedCoords = selectedComplex.lat !== null && selectedComplex.lng !== null;
+  const mapCenter = hasSelectedCoords
+    ? { lat: selectedComplex.lat as number, lng: selectedComplex.lng as number }
+    : { lat: district.lat, lng: district.lng };
 
   return (
     <div className="space-y-4">
@@ -42,8 +46,8 @@ export function ComplexMapExplorer({
         {markers.length > 0 ? (
           <KakaoMapView
             markers={markers}
-            center={{ lat: district.lat, lng: district.lng }}
-            level={6}
+            center={mapCenter}
+            level={hasSelectedCoords ? 4 : 6}
             onMarkerClick={setSelected}
           />
         ) : (
@@ -57,6 +61,20 @@ export function ComplexMapExplorer({
 
       {selectedComplex && (
         <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+              {selectedComplex.nearestSubwayName
+                ? `${selectedComplex.nearestSubwayName}역까지 ${selectedComplex.nearestSubwayDistanceM?.toLocaleString()}m`
+                : "인근 지하철역 정보 없음"}
+            </span>
+            <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+              {district.nameKo}업무지구까지{" "}
+              {selectedComplex.distanceToDistrictM !== null
+                ? `${(selectedComplex.distanceToDistrictM / 1000).toFixed(1)}km · 약 ${selectedComplex.estimatedMinutesToDistrict}분 (직선거리 추정)`
+                : "거리 정보 없음"}
+            </span>
+          </div>
+
           <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
             <p className="mb-2 text-xs font-medium text-neutral-500">
               {selectedComplex.complexName} 실거래가 추이
@@ -72,7 +90,7 @@ export function ComplexMapExplorer({
 
           <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
             <p className="mb-2 text-xs font-medium text-neutral-500">
-              {selectedComplex.complexName} 실거래 현황
+              {selectedComplex.complexName} 실거래 현황 (평수별)
             </p>
             <ComplexTradeTable trades={selectedComplex.recentTrades} />
           </div>
