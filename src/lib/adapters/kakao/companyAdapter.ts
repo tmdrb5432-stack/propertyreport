@@ -100,6 +100,8 @@ export class KakaoCompanyAdapter
           address: doc.road_address_name || doc.address_name,
           employeeCount,
           employeeCountSource: source,
+          lat: doc.y ? Number(doc.y) : null,
+          lng: doc.x ? Number(doc.x) : null,
         };
         return company;
       }),

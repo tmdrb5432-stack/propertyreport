@@ -16,6 +16,8 @@ export interface NotableCompany {
   employeeCount: number | null;
   /** "dart" = real OpenDART 직원현황 data (listed companies only); "estimate" = category-based heuristic. */
   employeeCountSource: "dart" | "estimate" | null;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface CompanySnapshotInput {
