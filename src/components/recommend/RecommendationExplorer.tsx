@@ -11,9 +11,8 @@ import { ComplexDetailPanel } from "@/components/district/ComplexDetailPanel";
 
 const RESULT_COUNT = 5;
 
-// Wide enough to keep all 5 business districts on screen at once (same
-// level the homepage overview map uses) — the fallback view before any one
-// result is selected and zoomed into.
+// Fallback only for the rare case the top-ranked result has no resolved
+// coordinates yet — wide enough to keep all 5 business districts on screen.
 const OVERVIEW_CENTER = {
   lat: DISTRICTS.reduce((sum, d) => sum + d.lat, 0) / DISTRICTS.length,
   lng: DISTRICTS.reduce((sum, d) => sum + d.lng, 0) / DISTRICTS.length,
@@ -96,7 +95,11 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
       .slice(0, RESULT_COUNT);
   }, [complexes, districtFilter, areaBand, priceBand]);
 
-  const selected = results.find((c) => keyOf(c) === selectedKey) ?? null;
+  // Defaults to the #1 result — the map should always be zoomed in on
+  // something concrete, never sitting on a wide empty-state view. Also
+  // naturally recovers if a filter change drops the current selection out
+  // of the result set.
+  const selected = results.find((c) => keyOf(c) === selectedKey) ?? results[0] ?? null;
 
   const markers = results
     .map((c, i) => ({ complex: c, rank: i + 1 }))
@@ -184,126 +187,123 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
         <p className="text-sm text-neutral-500">조건에 맞는 단지가 없습니다. 필터를 넓혀보세요.</p>
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-            <div className="h-80 overflow-hidden rounded-2xl border border-neutral-200 shadow-sm dark:border-neutral-800">
-              {markers.length > 0 ? (
-                <KakaoMapView
-                  markers={markers}
-                  center={mapCenter}
-                  level={hasSelectedCoords ? 4 : OVERVIEW_LEVEL}
-                  onMarkerClick={setSelectedKey}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-neutral-50 text-sm text-neutral-400 dark:bg-neutral-900">
-                  단지 위치를 아직 찾지 못했습니다. 잠시 후 다시 시도해주세요.
-                </div>
-              )}
-            </div>
-
-            {selected ? (
-              <div key={selectedKey} className="panel-enter">
-                <ComplexDetailPanel
-                  complex={selected}
-                  districtNameKo={selected.districtNameKo}
-                  reasons={selected.reasons}
-                  onClose={() => setSelectedKey(null)}
-                />
-              </div>
+          <div className="mb-6 h-[32rem] overflow-hidden rounded-2xl border border-neutral-200 shadow-sm dark:border-neutral-800">
+            {markers.length > 0 ? (
+              <KakaoMapView
+                markers={markers}
+                center={mapCenter}
+                level={hasSelectedCoords ? 4 : OVERVIEW_LEVEL}
+                onMarkerClick={setSelectedKey}
+              />
             ) : (
-              <div className="flex h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 p-6 text-center dark:border-neutral-700">
-                <p className="text-sm text-neutral-400">
-                  아래 목록이나 지도의 번호를 클릭하면
-                  <br />그 단지의 실거래가 추이 · 현황이 여기에 표시됩니다.
-                </p>
+              <div className="flex h-full w-full items-center justify-center bg-neutral-50 text-sm text-neutral-400 dark:bg-neutral-900">
+                단지 위치를 아직 찾지 못했습니다. 잠시 후 다시 시도해주세요.
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-4">
             {results.map((c, i) => {
               const key = keyOf(c);
-              const isSelected = selectedKey === key;
+              const isSelected = selected !== null && keyOf(selected) === key;
               return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSelectedKey(key)}
-                  className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition dark:bg-neutral-950 ${
-                    isSelected ? "" : "border-neutral-200 dark:border-neutral-800"
-                  }`}
-                  style={
-                    isSelected
-                      ? { borderColor: chartColors.series1Blue, boxShadow: `0 0 0 1px ${chartColors.series1Blue}` }
-                      : undefined
-                  }
-                >
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <RankBadge rank={i + 1} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-                          {c.complexName}
-                        </p>
-                        <p className="text-xs text-neutral-400">{c.districtNameKo}</p>
+                <div key={key}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedKey(key)}
+                    className={`w-full rounded-2xl border bg-white p-4 text-left shadow-sm transition dark:bg-neutral-950 ${
+                      isSelected ? "" : "border-neutral-200 dark:border-neutral-800"
+                    }`}
+                    style={
+                      isSelected
+                        ? { borderColor: chartColors.series1Blue, boxShadow: `0 0 0 1px ${chartColors.series1Blue}` }
+                        : undefined
+                    }
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <RankBadge rank={i + 1} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+                            {c.complexName}
+                          </p>
+                          <p className="text-xs text-neutral-400">{c.districtNameKo}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="w-28">
+                          <ScoreBar label="직주근접" value={c.jobProximityScore} color={chartColors.series1Blue} />
+                        </div>
+                        <div className="w-28">
+                          <ScoreBar label="가격 저렴함" value={c.affordabilityScore} color={chartColors.series2Orange} />
+                        </div>
+                        <div className="w-28">
+                          <ScoreBar label="저평가" value={c.undervaluationScore} color={chartColors.series3Aqua} />
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-lg font-bold" style={{ color: chartColors.series1Blue }}>
+                            {c.recommendScore}
+                          </p>
+                          <p className="text-[10px] text-neutral-400">종합점수</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-lg font-bold" style={{ color: chartColors.series1Blue }}>
-                        {c.recommendScore}
+
+                    {c.reasons[0] && (
+                      <p className="mt-2 flex gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+                        <span style={{ color: chartColors.series1Blue }}>▸</span>
+                        {c.reasons[0]}
                       </p>
-                      <p className="text-[10px] text-neutral-400">종합점수</p>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-400">
+                      <span>
+                        평당가{" "}
+                        <strong className="text-neutral-700 dark:text-neutral-200">
+                          {c.latestAvgPricePerPyeong ? `${c.latestAvgPricePerPyeong.toLocaleString()}만원` : "-"}
+                        </strong>
+                      </span>
+                      <span>
+                        평균 실거래가{" "}
+                        <strong className="text-neutral-700 dark:text-neutral-200">
+                          {c.latestAvgPriceTotal
+                            ? `${(c.latestAvgPriceTotal / 10000).toLocaleString(undefined, { maximumFractionDigits: 1 })}억원`
+                            : "-"}
+                        </strong>
+                      </span>
+                      <span>
+                        {c.nearestSubwayName
+                          ? `${c.nearestSubwayName}역 ${c.nearestSubwayDistanceM?.toLocaleString()}m`
+                          : "지하철역 정보 없음"}
+                      </span>
+                      <span>
+                        {c.distanceToDistrictM !== null
+                          ? `${c.districtNameKo}업무지구 ${(c.distanceToDistrictM / 1000).toFixed(1)}km`
+                          : "거리 정보 없음"}
+                      </span>
+                      <Link
+                        href={`/district/${c.districtId}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium hover:underline"
+                        style={{ color: chartColors.series1Blue }}
+                      >
+                        {c.districtNameKo} 지구 상세 보기 →
+                      </Link>
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="mb-3 space-y-2">
-                    <ScoreBar label="직주근접" value={c.jobProximityScore} color={chartColors.series1Blue} />
-                    <ScoreBar label="가격 저렴함" value={c.affordabilityScore} color={chartColors.series2Orange} />
-                    <ScoreBar label="저평가(상승률 낮음)" value={c.undervaluationScore} color={chartColors.series3Aqua} />
-                  </div>
-
-                  {c.reasons[0] && (
-                    <p className="mb-3 flex gap-1 text-xs text-neutral-500 dark:text-neutral-400">
-                      <span style={{ color: chartColors.series1Blue }}>▸</span>
-                      {c.reasons[0]}
-                    </p>
+                  {isSelected && (
+                    <div key={key} className="panel-enter mt-4">
+                      <ComplexDetailPanel
+                        complex={c}
+                        districtNameKo={c.districtNameKo}
+                        reasons={c.reasons}
+                        onClose={() => setSelectedKey(results[0] ? keyOf(results[0]) : null)}
+                      />
+                    </div>
                   )}
-
-                  <div className="mb-3 grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-lg bg-neutral-50 py-1.5 dark:bg-neutral-900">
-                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                        {c.latestAvgPricePerPyeong ? `${c.latestAvgPricePerPyeong.toLocaleString()}만원` : "-"}
-                      </p>
-                      <p className="text-[10px] text-neutral-400">평당가</p>
-                    </div>
-                    <div className="rounded-lg bg-neutral-50 py-1.5 dark:bg-neutral-900">
-                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                        {c.latestAvgPriceTotal
-                          ? `${(c.latestAvgPriceTotal / 10000).toLocaleString(undefined, { maximumFractionDigits: 1 })}억원`
-                          : "-"}
-                      </p>
-                      <p className="text-[10px] text-neutral-400">평균 실거래가</p>
-                    </div>
-                  </div>
-
-                  <p className="mb-3 text-xs text-neutral-400">
-                    {c.nearestSubwayName
-                      ? `${c.nearestSubwayName}역 ${c.nearestSubwayDistanceM?.toLocaleString()}m`
-                      : "지하철역 정보 없음"}
-                    {" · "}
-                    {c.distanceToDistrictM !== null
-                      ? `${c.districtNameKo}업무지구 ${(c.distanceToDistrictM / 1000).toFixed(1)}km`
-                      : "거리 정보 없음"}
-                  </p>
-
-                  <Link
-                    href={`/district/${c.districtId}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-xs font-medium hover:underline"
-                    style={{ color: chartColors.series1Blue }}
-                  >
-                    {c.districtNameKo} 지구 상세 보기 →
-                  </Link>
-                </button>
+                </div>
               );
             })}
           </div>
