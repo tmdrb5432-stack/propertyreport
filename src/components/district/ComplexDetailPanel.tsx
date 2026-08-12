@@ -1,6 +1,8 @@
 import type { TopComplex } from "@/lib/queries";
 import { ComplexTradeTable } from "@/components/district/ComplexTradeTable";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
+import { TransitScoreGauge } from "@/components/charts/TransitScoreGauge";
+import { chartColors } from "@/lib/chartTheme";
 
 function formatMonth(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -30,6 +32,12 @@ export function ComplexDetailPanel({
           ×
         </button>
       </div>
+
+      <TransitScoreGauge
+        score={complex.jobProximityScore}
+        label="직주근접 지수"
+        color={chartColors.series1Blue}
+      />
 
       <div className="flex flex-wrap gap-2">
         <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">

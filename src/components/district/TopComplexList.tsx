@@ -1,5 +1,6 @@
 import type { TopComplex } from "@/lib/queries";
 import { Sparkline } from "@/components/charts/Sparkline";
+import { chartColors } from "@/lib/chartTheme";
 
 function formatMonth(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -36,9 +37,20 @@ export function TopComplexList({
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                  {complex.complexName}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                    {complex.complexName}
+                  </p>
+                  <span
+                    className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                    style={{
+                      background: `${chartColors.series1Blue}1a`,
+                      color: chartColors.series1Blue,
+                    }}
+                  >
+                    직주근접 {complex.jobProximityScore}
+                  </span>
+                </div>
                 <p className="text-xs text-neutral-400">
                   {formatMonth(complex.latestPeriodDate)} 기준 거래 {complex.latestTransactionCount}건
                 </p>
