@@ -7,6 +7,10 @@ import { resolveComplexLocations } from "@/lib/kakao/geocodeComplex";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+// MOLIT's API (apis.data.go.kr) is a Korean government gateway that hangs
+// from Vercel's default US region — see seed-dart-corpcodes for the same fix
+// (requires Function Region = Seoul in Vercel project settings).
+export const preferredRegion = "home";
 
 // Daily refresh of per-apartment-complex 실거래가 snapshots (mock, or MOLIT
 // real data once TRANSACTION source envs are set to "real"). Powers the

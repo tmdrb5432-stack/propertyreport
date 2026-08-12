@@ -6,6 +6,10 @@ import { transactionAdapter } from "@/lib/adapters/transactions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+// MOLIT's API (apis.data.go.kr) is a Korean government gateway that hangs
+// from Vercel's default US region — see seed-dart-corpcodes for the same fix
+// (requires Function Region = Seoul in Vercel project settings).
+export const preferredRegion = "home";
 
 // Daily refresh of 실거래가 snapshots (mock, or MOLIT real data once
 // TRANSACTION_DATA_SOURCE=real is set).
