@@ -12,6 +12,10 @@ export interface NotableCompany {
   name: string;
   category: string;
   address: string;
+  /** Employee count if resolved (real DART figure or a size heuristic), else null. */
+  employeeCount: number | null;
+  /** "dart" = real OpenDART 직원현황 data (listed companies only); "estimate" = category-based heuristic. */
+  employeeCountSource: "dart" | "estimate" | null;
 }
 
 export interface CompanySnapshotInput {
@@ -31,6 +35,17 @@ export interface TransitSnapshotInput {
 
 export interface TransactionSnapshotInput {
   periodDate: Date;
+  avgPricePerPyeong: number | null;
+  avgPriceTotal: number | null;
+  medianPriceTotal: number | null;
+  transactionCount: number;
+  propertyType: string;
+  raw?: unknown;
+}
+
+export interface ComplexTransactionSnapshotInput {
+  periodDate: Date;
+  complexName: string;
   avgPricePerPyeong: number | null;
   avgPriceTotal: number | null;
   medianPriceTotal: number | null;

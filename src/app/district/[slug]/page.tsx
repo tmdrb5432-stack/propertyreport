@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDistrictDetail } from "@/lib/queries";
+import { getDistrictDetail, getTopComplexesForDistrict } from "@/lib/queries";
 import { KakaoMapView } from "@/components/map/KakaoMapView";
 import { TransitScoreGauge } from "@/components/charts/TransitScoreGauge";
 import { CompanyList } from "@/components/district/CompanyList";
+import { TopComplexList } from "@/components/district/TopComplexList";
 import { FreshnessRow } from "@/components/district/FreshnessBadge";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
 import { AskingPriceTrendChart } from "@/components/charts/AskingPriceTrendChart";
@@ -21,7 +22,10 @@ export default async function DistrictDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const district = await getDistrictDetail(slug);
+  const [district, topComplexes] = await Promise.all([
+    getDistrictDetail(slug),
+    getTopComplexesForDistrict(slug),
+  ]);
   if (!district) notFound();
 
   const transactionPoints = district.transactions.map((t) => ({
@@ -94,6 +98,15 @@ export default async function DistrictDetailPage({
         <h2 className="mb-2 text-sm font-semibold text-neutral-600 dark:text-neutral-300">주요회사</h2>
         <div className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
           <CompanyList companies={district.notableCompanies} />
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-2 text-sm font-semibold text-neutral-600 dark:text-neutral-300">
+          단지별 실거래가 TOP 3 <span className="font-normal text-neutral-400">(mock)</span>
+        </h2>
+        <div className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
+          <TopComplexList complexes={topComplexes} />
         </div>
       </section>
 

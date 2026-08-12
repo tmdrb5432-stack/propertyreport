@@ -7,7 +7,8 @@
 ## 기술 스택
 
 - Next.js (App Router) + TypeScript, Tailwind CSS
-- Prisma + SQLite(로컬) — 배포 시 `DATABASE_URL`만 Postgres로 교체
+- Prisma + Postgres (Neon/Supabase/Vercel Postgres 등 — Vercel 서버리스는 파일시스템이
+  휘발성이라 SQLite를 쓸 수 없어, 로컬 개발도 같은 Postgres를 사용합니다)
 - recharts (트렌드 차트), react-kakao-maps-sdk (지도)
 - 카카오 Local REST API (회사/교통 실데이터), 나머지는 실 API 형태에 맞춘 mock 어댑터
 
@@ -15,10 +16,11 @@
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
-| 교통 환경 (지하철/버스) | **실데이터** (카카오) | `KAKAO_REST_KEY` 필요 |
-| 회사수 / 주요회사 | **실데이터** (카카오) | Kakao Local API 페이지네이션 상한(~45건)으로 근사치 |
-| 종사자수 | 추정치 없음 (null) | 카카오 API에 없는 데이터. 별도 소스 필요 |
-| 실거래가 | mock (실 API 응답 형태와 동일한 타입) | 공공데이터포털 국토부 실거래가 키 발급 후 `src/lib/adapters/transactions/realTransactionAdapter.ts` 구현 |
+| 교통 환경 (지하철/버스) | **실데이터** (카카오) | `KAKAO_REST_KEY` 필요, 지구 중심 반경 5km(`PROXIMITY_RADIUS_M`) |
+| 회사수 / 주요회사 | **실데이터** (카카오) | 반경 5km, Kakao Local API 페이지네이션 상한(~45건)으로 근사치 |
+| 종사자수 | **상장사는 실데이터(DART), 비상장은 추정치** | OpenDART 매칭 성공 시 실제 직원현황, 실패 시 카테고리 기반 추정 — `DART_API_KEY` 필요 |
+| 실거래가 (지구 단위) | mock (실 API 응답 형태와 동일한 타입) | 공공데이터포털 국토부 실거래가 키 발급 후 `src/lib/adapters/transactions/realTransactionAdapter.ts` 구현 |
+| 실거래가 (단지별 TOP 3) | mock (실 API 응답 형태와 동일한 타입) | 반경 5km 내 단지 기준. `src/lib/adapters/complexTransactions/realComplexTransactionAdapter.ts` 구현 대상 |
 | 호가 | mock (real 경로 미구현) | 공식 API 없음. 크롤링은 대상 사이트 약관 법적 검토 후 별도 진행 |
 | 전입/전출 | mock (실 API 응답 형태와 동일한 타입) | KOSIS Open API 키 발급 후 `src/lib/adapters/migration/realMigrationAdapter.ts` 구현 |
 | 지도 렌더링 | JS 키 있으면 실제 지도, 없으면 안내 placeholder | `NEXT_PUBLIC_KAKAO_JS_KEY` |
@@ -28,10 +30,12 @@
 ```bash
 npm install
 cp .env.example .env.local
-# .env.local에 KAKAO_REST_KEY, (있다면) NEXT_PUBLIC_KAKAO_JS_KEY, CRON_SECRET 입력
+# .env.local에 DATABASE_URL(Postgres 연결 문자열), KAKAO_REST_KEY,
+# (있다면) NEXT_PUBLIC_KAKAO_JS_KEY, CRON_SECRET 입력
+# (Neon neon.tech 등에서 무료 Postgres를 바로 만들 수 있습니다)
 
-npx prisma migrate dev   # 최초 1회 (DB 스키마 적용)
-npx prisma db seed       # 5개 지구 시드
+npx prisma migrate deploy   # 최초 1회 (DB 스키마 적용)
+npx prisma db seed          # 5개 지구 시드
 
 npm run dev
 ```
@@ -44,14 +48,18 @@ npm run dev
 ```bash
 CRON_SECRET=여기에_env의_값
 
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/seed-dart-corpcodes
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-kakao
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-transactions
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-complex-transactions
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-asking-price
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/update-migration
 ```
 
-- `update-kakao`: 카카오 Local API로 회사수/주요회사/교통(지하철·버스) 실데이터 수집
-- `update-transactions`: 실거래가 mock 시계열 생성/갱신 (월 6개월치)
+- `seed-dart-corpcodes`: OpenDART 상장사 corp code 목록을 DB에 채움 (최초 1회 + 가끔) — `DART_API_KEY` 필요, 없으면 그냥 스킵하고 진행해도 됨(추정치로 동작)
+- `update-kakao`: 카카오 Local API로 회사수/주요회사(종사자수 실데이터/추정 포함)/교통(지하철·버스) 수집 — 반경 5km
+- `update-transactions`: 지구 단위 실거래가 mock 시계열 생성/갱신 (월 6개월치)
+- `update-complex-transactions`: 단지별 실거래가 mock 시계열 생성/갱신 (월 6개월치) — TOP 3 카드용
 - `update-asking-price`: 호가 mock 시계열 생성/갱신 (주 8주치) — 데모용 수동 라우트, cron 미등록
 - `update-migration`: 전입/전출 mock 시계열 생성/갱신 (월 6개월치)
 
@@ -62,7 +70,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/upda
 | 소스 | 주기 | 이유 |
 |---|---|---|
 | 카카오 (교통/회사) | 매일 | POI 데이터가 하루 안에 크게 바뀌지 않음 |
-| 실거래가 | 매일 | 국토부 실거래 신고는 계약 후 최대 30일 소요 — 일 단위가 실질적 한계 |
+| 실거래가 (지구/단지) | 매일 | 국토부 실거래 신고는 계약 후 최대 30일 소요 — 일 단위가 실질적 한계 |
 | 호가 | 수동 (데모용) | 공식 API 없음. 실서비스화 시 크롤링 대상 사이트 약관 검토 필요 |
 | 전입/전출 | 매월 1일 | 통계청 KOSIS는 월 단위로 발표 |
 
@@ -82,11 +90,20 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/upda
    `MIGRATION_DATA_SOURCE=real` 설정.
 4. **호가**: 공식 API가 없어 이번 빌드에는 포함하지 않았습니다. 크롤링으로 구현하려면 먼저
    대상 사이트(예: 네이버 부동산)의 이용약관을 검토하세요.
+5. **단지별 실거래가 TOP 3**: 실거래가와 동일한 공공데이터포털 키로
+   `src/lib/adapters/complexTransactions/realComplexTransactionAdapter.ts`의 `fetch`를 구현하고
+   `COMPLEX_TRANSACTION_DATA_SOURCE=real` 설정.
+6. **주요회사 종사자수**: [OpenDART](https://opendart.fss.or.kr)에서 무료 키 발급 →
+   `.env.local`에 `DART_API_KEY` 설정 → `seed-dart-corpcodes` 라우트를 한 번 호출해 상장사
+   corp code를 채운 뒤 `update-kakao`를 다시 실행하면, 카카오 검색 결과 중 상장사와 이름이
+   매칭되는 회사는 실제 직원현황으로, 나머지는 계속 추정치로 표시됩니다.
 
 ## 프로덕션 배포 시 유의사항
 
-- Vercel 등 서버리스 환경은 파일시스템이 휘발성이므로 SQLite(`file:./dev.db`)는 로컬 개발용입니다.
-  배포 시 `DATABASE_URL`을 Neon/Supabase/Vercel Postgres 등 호스팅 Postgres로 교체하세요
-  (Prisma 스키마 변경 불필요).
+- Vercel 프로젝트 환경변수에 `DATABASE_URL`(Postgres), `KAKAO_REST_KEY`,
+  `NEXT_PUBLIC_KAKAO_JS_KEY`(있다면), `DART_API_KEY`(있다면), `CRON_SECRET`을 설정하세요.
+- `package.json`의 `vercel-build` 스크립트(`prisma migrate deploy && next build`)가 배포마다
+  자동으로 마이그레이션을 적용하므로, `DATABASE_URL`만 설정되어 있으면 별도 수동 마이그레이션은
+  필요 없습니다.
 - `CRON_SECRET`을 Vercel 프로젝트 환경변수로 설정하면 Vercel Cron이 자동으로
   `Authorization: Bearer $CRON_SECRET` 헤더를 붙여 호출합니다.
