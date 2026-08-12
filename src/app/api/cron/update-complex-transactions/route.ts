@@ -34,25 +34,15 @@ export async function GET(request: Request) {
       district.radiusM,
     );
 
-    for (const snapshot of snapshots) {
-      await prisma.complexTransactionSnapshot.upsert({
-        where: {
-          districtId_complexName_propertyType_periodDate: {
-            districtId: district.id,
-            complexName: snapshot.complexName,
-            propertyType: snapshot.propertyType,
-            periodDate: snapshot.periodDate,
-          },
-        },
-        update: {
-          avgPricePerPyeong: snapshot.avgPricePerPyeong,
-          avgPriceTotal: snapshot.avgPriceTotal,
-          medianPriceTotal: snapshot.medianPriceTotal,
-          transactionCount: snapshot.transactionCount,
-          source: complexTransactionAdapter.sourceName,
-          raw: snapshot.raw === undefined ? undefined : (snapshot.raw as object),
-        },
-        create: {
+    // A district can have hundreds of (complex x month) rows — one upsert
+    // per row was the same "thousands of round-trips" mistake fixed in
+    // seed-dart-corpcodes, and was timing out here for the same reason.
+    // This table has no incoming FK and is always regenerated fresh from
+    // the adapter's current fetch, so a full per-district replace is safe.
+    await prisma.$transaction([
+      prisma.complexTransactionSnapshot.deleteMany({ where: { districtId: district.id } }),
+      prisma.complexTransactionSnapshot.createMany({
+        data: snapshots.map((snapshot) => ({
           districtId: district.id,
           periodDate: snapshot.periodDate,
           complexName: snapshot.complexName,
@@ -63,9 +53,9 @@ export async function GET(request: Request) {
           propertyType: snapshot.propertyType,
           source: complexTransactionAdapter.sourceName,
           raw: snapshot.raw === undefined ? undefined : (snapshot.raw as object),
-        },
-      });
-    }
+        })),
+      }),
+    ]);
   });
 
   return NextResponse.json({ complexTransaction: results });
