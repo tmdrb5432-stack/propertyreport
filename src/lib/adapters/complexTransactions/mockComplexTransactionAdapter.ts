@@ -49,16 +49,35 @@ export class MockComplexTransactionAdapter
         const avgPricePerPyeong = Math.round(level);
         const avgPyeongSize = randRange(rng, 24, 34);
         const avgPriceTotal = Math.round(avgPricePerPyeong * avgPyeongSize);
+        const transactionCount = Math.round(randRange(rng, 2, 15));
+        const periodDate = monthStart(monthsAgo);
+
+        // Synthetic individual trades around the month's average, so the
+        // "그 아파트 클릭 -> 실거래 현황" detail view has something to show
+        // even without real MOLIT data — same raw shape as the real adapter.
+        const trades = Array.from({ length: transactionCount }, () => {
+          const areaPyeong = randRange(rng, 20, 40);
+          const pricePerPyeong = Math.round(avgPricePerPyeong * randRange(rng, 0.9, 1.1));
+          const dayOfMonth = Math.max(1, Math.round(randRange(rng, 1, 28)));
+          const dealDate = new Date(periodDate);
+          dealDate.setUTCDate(dayOfMonth);
+          return {
+            dealDate: dealDate.toISOString(),
+            areaPyeong: Math.round(areaPyeong * 10) / 10,
+            pricePerPyeong,
+            priceTotal: Math.round(pricePerPyeong * areaPyeong),
+          };
+        }).sort((a, b) => b.dealDate.localeCompare(a.dealDate));
 
         snapshots.push({
-          periodDate: monthStart(monthsAgo),
+          periodDate,
           complexName,
           avgPricePerPyeong,
           avgPriceTotal,
           medianPriceTotal: Math.round(avgPriceTotal * randRange(rng, 0.95, 1.05)),
-          transactionCount: Math.round(randRange(rng, 2, 15)),
+          transactionCount,
           propertyType: PROPERTY_TYPE,
-          raw: null,
+          raw: trades,
         });
       }
     }

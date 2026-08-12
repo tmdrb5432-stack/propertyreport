@@ -43,6 +43,16 @@ export interface TransactionSnapshotInput {
   raw?: unknown;
 }
 
+// One individual 실거래 record within a month — stored in
+// ComplexTransactionSnapshot.raw so the district page can list actual deals
+// (평수 + 실거래금액), not just the monthly aggregate.
+export interface ComplexTradeRecord {
+  dealDate: string; // ISO date string
+  areaPyeong: number;
+  pricePerPyeong: number;
+  priceTotal: number; // 만원
+}
+
 export interface ComplexTransactionSnapshotInput {
   periodDate: Date;
   complexName: string;
@@ -51,7 +61,7 @@ export interface ComplexTransactionSnapshotInput {
   medianPriceTotal: number | null;
   transactionCount: number;
   propertyType: string;
-  raw?: unknown;
+  raw?: ComplexTradeRecord[] | null;
 }
 
 export interface AskingPriceSnapshotInput {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { TopComplex } from "@/lib/queries";
 import { KakaoMapView } from "@/components/map/KakaoMapView";
 import { TopComplexList } from "@/components/district/TopComplexList";
+import { ComplexTradeTable } from "@/components/district/ComplexTradeTable";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
 
 function formatMonth(date: Date): string {
@@ -55,17 +56,26 @@ export function ComplexMapExplorer({
       <TopComplexList complexes={complexes} selected={selected} onSelect={setSelected} />
 
       {selectedComplex && (
-        <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
-          <p className="mb-2 text-xs font-medium text-neutral-500">
-            {selectedComplex.complexName} 실거래가 추이
-          </p>
-          <TransactionTrendChart
-            data={selectedComplex.trend.map((t) => ({
-              periodDate: formatMonth(t.periodDate),
-              avgPricePerPyeong: t.avgPricePerPyeong,
-              transactionCount: t.transactionCount,
-            }))}
-          />
+        <div className="space-y-4">
+          <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+            <p className="mb-2 text-xs font-medium text-neutral-500">
+              {selectedComplex.complexName} 실거래가 추이
+            </p>
+            <TransactionTrendChart
+              data={selectedComplex.trend.map((t) => ({
+                periodDate: formatMonth(t.periodDate),
+                avgPricePerPyeong: t.avgPricePerPyeong,
+                transactionCount: t.transactionCount,
+              }))}
+            />
+          </div>
+
+          <div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+            <p className="mb-2 text-xs font-medium text-neutral-500">
+              {selectedComplex.complexName} 실거래 현황
+            </p>
+            <ComplexTradeTable trades={selectedComplex.recentTrades} />
+          </div>
         </div>
       )}
     </div>

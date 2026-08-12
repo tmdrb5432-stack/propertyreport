@@ -11,6 +11,8 @@ const EARTH_RADIUS_M = 6371000;
 export interface DistrictTrade {
   complexName: string;
   periodDate: Date; // month bucket, matches mock adapters' monthStart()
+  dealDate: Date; // exact contract date, for the per-transaction detail view
+  areaPyeong: number;
   pricePerPyeong: number;
   priceTotal: number; // 만원
 }
@@ -69,6 +71,8 @@ export async function fetchDistrictTrades(district: DistrictConfig): Promise<Dis
     trades.push({
       complexName: row.aptName,
       periodDate,
+      dealDate: row.dealDate,
+      areaPyeong: row.areaM2 / PYEONG_M2,
       pricePerPyeong: row.dealAmountManwon / (row.areaM2 / PYEONG_M2),
       priceTotal: row.dealAmountManwon,
     });
