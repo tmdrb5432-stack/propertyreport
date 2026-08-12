@@ -20,24 +20,18 @@ export async function GET(request: Request) {
   try {
     const entries = await fetchListedCorpCodes();
 
-    const BATCH_SIZE = 500;
-    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-      const batch = entries.slice(i, i + BATCH_SIZE);
-      await prisma.$transaction(
-        batch.map((e) =>
-          prisma.dartCorpCode.upsert({
-            where: { corpCode: e.corpCode },
-            update: { corpName: e.corpName, stockCode: e.stockCode, modifyDate: e.modifyDate },
-            create: {
-              corpCode: e.corpCode,
-              corpName: e.corpName,
-              stockCode: e.stockCode,
-              modifyDate: e.modifyDate,
-            },
-          }),
-        ),
-      );
-    }
+    // Reference data with a stable identity (corpCode) and no incoming FK
+    // references — a full replace via bulk createMany is far faster than
+    // thousands of individual upserts (which was timing out on Hobby's 60s
+    // cap: one query round-trip per row vs. one per few thousand rows).
+    const BATCH_SIZE = 5000;
+    await prisma.$transaction(async (tx) => {
+      await tx.dartCorpCode.deleteMany({});
+      for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+        const batch = entries.slice(i, i + BATCH_SIZE);
+        await tx.dartCorpCode.createMany({ data: batch, skipDuplicates: true });
+      }
+    });
 
     return NextResponse.json({ seeded: entries.length });
   } catch (err) {
