@@ -12,10 +12,13 @@ export function ComplexDetailPanel({
   complex,
   districtNameKo,
   onClose,
+  reasons,
 }: {
   complex: TopComplex;
   districtNameKo: string;
   onClose: () => void;
+  /** Only present when opened from the 추천 매물 finder — why this one ranked well. */
+  reasons?: string[];
 }) {
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-md ring-1 ring-neutral-900/5 dark:border-neutral-800 dark:bg-neutral-950">
@@ -26,12 +29,31 @@ export function ComplexDetailPanel({
         <button
           type="button"
           onClick={onClose}
-          aria-label="닫고 주요회사로 돌아가기"
+          aria-label="닫기"
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
         >
           ×
         </button>
       </div>
+
+      {reasons && reasons.length > 0 && (
+        <div
+          className="rounded-xl border p-3"
+          style={{ borderColor: `${chartColors.series1Blue}33`, background: `${chartColors.series1Blue}0d` }}
+        >
+          <p className="mb-1.5 text-xs font-semibold" style={{ color: chartColors.series1Blue }}>
+            추천 이유
+          </p>
+          <ul className="space-y-1 text-xs text-neutral-600 dark:text-neutral-300">
+            {reasons.map((reason) => (
+              <li key={reason} className="flex gap-1.5">
+                <span style={{ color: chartColors.series1Blue }}>·</span>
+                {reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <TransitScoreGauge
         score={complex.jobProximityScore}
