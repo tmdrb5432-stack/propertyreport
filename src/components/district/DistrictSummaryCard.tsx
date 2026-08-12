@@ -5,6 +5,7 @@ import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import type { DistrictOverview } from "@/lib/queries";
 import { chartColors } from "@/lib/chartTheme";
 import { TransitScoreGauge } from "@/components/charts/TransitScoreGauge";
+import { RankBadge } from "@/components/RankBadge";
 
 function Sparkline({ points }: { points: { avgPricePerPyeong: number | null }[] }) {
   const data = points.filter((p) => p.avgPricePerPyeong !== null);
@@ -44,20 +45,6 @@ function GrowthBadge({ ratio }: { ratio: number | null }) {
       style={{ color, background: isUp ? "#0ca30c1a" : "#d03b3b1a" }}
     >
       {isUp ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
-    </span>
-  );
-}
-
-const RANK_BADGE_COLORS = ["#eda100", "#898781", "#b08d57"]; // 1st/2nd/3rd — gold/silver/bronze accent, rest neutral
-
-function RankBadge({ rank }: { rank: number }) {
-  const color = RANK_BADGE_COLORS[rank - 1] ?? chartColors.mutedInk;
-  return (
-    <span
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-      style={{ background: color }}
-    >
-      {rank}
     </span>
   );
 }

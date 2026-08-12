@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/db";
-import { DISTRICTS } from "@/lib/districts";
+import { DISTRICTS, type DistrictConfig } from "@/lib/districts";
 import { computeJobHousingIndex } from "@/lib/scoring/jobHousingIndex";
 import { computeMobilityIndex } from "@/lib/scoring/mobilityIndex";
+import {
+  computeComplexJobProximity,
+  computeDistrictJobDensity,
+  computeValueScores,
+} from "@/lib/scoring/complexScore";
 import { getDistrictFreshness, type FreshnessInfo } from "@/lib/freshness";
 import type { ComplexTradeRecord, NotableCompany } from "@/lib/adapters/types";
 import { haversineM } from "@/lib/geo";
@@ -225,6 +230,8 @@ export interface TopComplex {
   nearestSubwayDistanceM: number | null;
   distanceToDistrictM: number | null;
   estimatedMinutesToDistrict: number | null;
+  /** 0-100: district job density (50%) + closeness to the district center (30%) + closeness to a subway station (20%). */
+  jobProximityScore: number;
 }
 
 const RECENT_TRADES_LIMIT = 60;
@@ -242,18 +249,29 @@ function parseTradeRecords(raw: unknown): ComplexTradeRecord[] {
   );
 }
 
-/**
- * Top N apartment complexes in a district by latest 실거래가 (평당가), each
- * with its recent trend for a mini chart. Prisma has no native "latest row
- * per group, then order by that value" query, so this fetches the full
- * per-complex history (bounded — a handful of complexes x 6 months per
- * district) and does the latest-per-complex + ranking in JS.
- */
-export async function getTopComplexesForDistrict(
-  districtId: string,
-  limit = 5,
-): Promise<TopComplex[]> {
-  const rows = await prisma.complexTransactionSnapshot.findMany({
+type ComplexHistoryRow = {
+  complexName: string;
+  periodDate: Date;
+  avgPricePerPyeong: number | null;
+  avgPriceTotal: number | null;
+  transactionCount: number;
+  raw: unknown;
+};
+
+type ComplexSummary = Omit<
+  TopComplex,
+  | "lat"
+  | "lng"
+  | "nearestSubwayName"
+  | "nearestSubwayDistanceM"
+  | "distanceToDistrictM"
+  | "estimatedMinutesToDistrict"
+  | "jobProximityScore"
+>;
+type ComplexWithLocation = Omit<TopComplex, "jobProximityScore">;
+
+async function fetchComplexHistoryRows(districtId: string): Promise<ComplexHistoryRow[]> {
+  return prisma.complexTransactionSnapshot.findMany({
     where: { districtId, propertyType: "아파트" },
     orderBy: { periodDate: "asc" },
     select: {
@@ -265,18 +283,18 @@ export async function getTopComplexesForDistrict(
       raw: true,
     },
   });
+}
 
-  const byComplex = new Map<string, typeof rows>();
+/** Groups raw monthly rows into one summary per complex — unsorted, unfiltered by rank. */
+function buildComplexSummaries(rows: ComplexHistoryRow[]): ComplexSummary[] {
+  const byComplex = new Map<string, ComplexHistoryRow[]>();
   for (const row of rows) {
     const existing = byComplex.get(row.complexName);
     if (existing) existing.push(row);
     else byComplex.set(row.complexName, [row]);
   }
 
-  const complexes: Omit<
-    TopComplex,
-    "lat" | "lng" | "nearestSubwayName" | "nearestSubwayDistanceM" | "distanceToDistrictM" | "estimatedMinutesToDistrict"
-  >[] = [];
+  const complexes: ComplexSummary[] = [];
   for (const [complexName, history] of byComplex) {
     const latest = history[history.length - 1];
     if (latest.avgPricePerPyeong === null) continue;
@@ -300,25 +318,27 @@ export async function getTopComplexesForDistrict(
       recentTrades,
     });
   }
+  return complexes;
+}
 
-  complexes.sort(
-    (a, b) => (b.latestAvgPricePerPyeong ?? 0) - (a.latestAvgPricePerPyeong ?? 0),
-  );
+/**
+ * Attaches coordinates + nearest subway (a plain cache read — resolved by
+ * the update-complex-transactions cron, no Kakao calls here) and derives
+ * distance/time to the district center from them.
+ */
+async function attachComplexLocations(
+  districtId: string,
+  district: DistrictConfig | undefined,
+  list: ComplexSummary[],
+): Promise<ComplexWithLocation[]> {
+  if (list.length === 0) return [];
 
-  const top = complexes.slice(0, limit);
-  if (top.length === 0) return [];
-
-  const district = DISTRICTS.find((d) => d.id === districtId);
-
-  // Coordinates + nearest subway are resolved+cached by the
-  // update-complex-transactions cron (via resolveComplexLocations), so this
-  // is a plain cache read — no Kakao calls happen during page render.
   const locations = await prisma.complexLocationCache.findMany({
-    where: { districtId, complexName: { in: top.map((c) => c.complexName) } },
+    where: { districtId, complexName: { in: list.map((c) => c.complexName) } },
   });
   const locationByName = new Map(locations.map((l) => [l.complexName, l]));
 
-  return top.map((c) => {
+  return list.map((c) => {
     const loc = locationByName.get(c.complexName);
     const lat = loc?.lat ?? null;
     const lng = loc?.lng ?? null;
@@ -340,4 +360,125 @@ export async function getTopComplexesForDistrict(
           : null,
     };
   });
+}
+
+/**
+ * District job density normalized across all 5 districts (same basis as the
+ * district-level 직주근접 지수) — fetched fresh each call since it's just 5
+ * cheap findFirst queries, and callers need it alongside per-district data
+ * that's fetched in the same request anyway.
+ */
+async function getDistrictJobDensityMap(): Promise<Record<string, number>> {
+  const companySnapshots = await Promise.all(
+    DISTRICTS.map((d) =>
+      prisma.companySnapshot.findFirst({
+        where: { districtId: d.id },
+        orderBy: { capturedAt: "desc" },
+      }),
+    ),
+  );
+  return computeDistrictJobDensity(
+    DISTRICTS.map((d, i) => ({
+      districtId: d.id,
+      companyCount: companySnapshots[i]?.companyCount ?? 0,
+      employeeCount: companySnapshots[i]?.employeeCount ?? null,
+    })),
+  );
+}
+
+function attachJobProximity(
+  list: ComplexWithLocation[],
+  districtId: string,
+  jobDensityByDistrict: Record<string, number>,
+): TopComplex[] {
+  const districtJobDensityScore = jobDensityByDistrict[districtId] ?? 0;
+  return list.map((c) => ({
+    ...c,
+    jobProximityScore: computeComplexJobProximity({
+      districtJobDensityScore,
+      distanceToDistrictM: c.distanceToDistrictM,
+      nearestSubwayDistanceM: c.nearestSubwayDistanceM,
+    }),
+  }));
+}
+
+/**
+ * Top N apartment complexes in a district by latest 실거래가 (평당가), each
+ * with its recent trend for a mini chart. Prisma has no native "latest row
+ * per group, then order by that value" query, so this fetches the full
+ * per-complex history (bounded — a handful of complexes x 6 months per
+ * district) and does the latest-per-complex + ranking in JS.
+ */
+export async function getTopComplexesForDistrict(
+  districtId: string,
+  limit = 5,
+): Promise<TopComplex[]> {
+  const [rows, jobDensityByDistrict] = await Promise.all([
+    fetchComplexHistoryRows(districtId),
+    getDistrictJobDensityMap(),
+  ]);
+  const summaries = buildComplexSummaries(rows);
+  summaries.sort((a, b) => (b.latestAvgPricePerPyeong ?? 0) - (a.latestAvgPricePerPyeong ?? 0));
+  const top = summaries.slice(0, limit);
+
+  const district = DISTRICTS.find((d) => d.id === districtId);
+  const withLocation = await attachComplexLocations(districtId, district, top);
+  return attachJobProximity(withLocation, districtId, jobDensityByDistrict);
+}
+
+export interface RecommendedComplex extends TopComplex {
+  districtId: string;
+  districtNameKo: string;
+  /** 0-100 within the full candidate pool: cheaper 평당가 now scores higher. */
+  affordabilityScore: number;
+  /** 0-100 within the full candidate pool: grown less over the last 6 months scores higher ("hasn't caught up yet"). */
+  undervaluationScore: number;
+  /** jobProximityScore*0.4 + affordabilityScore*0.3 + undervaluationScore*0.3 */
+  recommendScore: number;
+}
+
+/**
+ * Every apartment complex across all 5 districts (not just each district's
+ * priciest — the point here is to surface good-value ones, which the
+ * price-ranked TOP5 would systematically exclude), scored and sorted for
+ * the 추천 매물 finder. Scores are computed once over the full pool server
+ * side; the UI filters/slices client side rather than re-querying.
+ */
+export async function getRecommendedComplexes(): Promise<RecommendedComplex[]> {
+  const jobDensityByDistrict = await getDistrictJobDensityMap();
+
+  const perDistrict = await Promise.all(
+    DISTRICTS.map(async (district) => {
+      const rows = await fetchComplexHistoryRows(district.id);
+      const summaries = buildComplexSummaries(rows);
+      const withLocation = await attachComplexLocations(district.id, district, summaries);
+      const withJobProximity = attachJobProximity(withLocation, district.id, jobDensityByDistrict);
+      return withJobProximity.map((c) => ({
+        ...c,
+        districtId: district.id,
+        districtNameKo: district.nameKo,
+      }));
+    }),
+  );
+
+  const all = perDistrict.flat();
+  if (all.length === 0) return [];
+
+  const { affordability, undervaluation } = computeValueScores(
+    all.map((c) => ({
+      latestAvgPricePerPyeong: c.latestAvgPricePerPyeong ?? 0,
+      priceGrowthRatio: priceGrowthRatio(c.trend),
+    })),
+  );
+
+  return all
+    .map((c, i) => {
+      const affordabilityScore = Math.round(affordability[i]);
+      const undervaluationScore = Math.round(undervaluation[i]);
+      const recommendScore = Math.round(
+        c.jobProximityScore * 0.4 + affordabilityScore * 0.3 + undervaluationScore * 0.3,
+      );
+      return { ...c, affordabilityScore, undervaluationScore, recommendScore };
+    })
+    .sort((a, b) => b.recommendScore - a.recommendScore);
 }
