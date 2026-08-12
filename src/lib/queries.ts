@@ -23,6 +23,7 @@ export interface DistrictOverview {
   subwayLines: string[];
   latestPricePerPyeong: number | null;
   priceTrend: { periodDate: Date; avgPricePerPyeong: number | null }[];
+  priceGrowthRatio: number | null;
   jobHousingIndex: number;
   mobilityIndex: number;
   freshness: FreshnessInfo[];
@@ -104,6 +105,7 @@ export async function getOverviewData(): Promise<DistrictOverview[]> {
     subwayLines: r.subwayLines,
     latestPricePerPyeong: r.latestPricePerPyeong,
     priceTrend: r.priceTrend,
+    priceGrowthRatio: r.growthRatio,
     freshness: r.freshness,
     jobHousingIndex: jobHousingScores[r.id] ?? 0,
     mobilityIndex: mobilityScores[r.id] ?? 0,
