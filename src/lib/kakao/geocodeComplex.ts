@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { searchKeyword } from "@/lib/adapters/kakao/client";
 
-const CONCURRENCY = 8;
+const CONCURRENCY = 16;
 
 export interface LatLng {
   lat: number;
@@ -9,10 +9,12 @@ export interface LatLng {
 }
 
 async function geocodeOne(
+  districtId: string,
   complexName: string,
   near: LatLng,
   radiusM: number,
 ): Promise<LatLng | null> {
+  let loc: LatLng | null = null;
   try {
     const docs = await searchKeyword({
       query: complexName,
@@ -21,11 +23,23 @@ async function geocodeOne(
       radius: Math.min(radiusM * 2, 20000), // Kakao's max radius is 20km; bias search, don't hard-limit.
     });
     const best = docs[0];
-    if (!best) return null;
-    return { lat: Number(best.y), lng: Number(best.x) };
+    if (best) loc = { lat: Number(best.y), lng: Number(best.x) };
   } catch {
-    return null;
+    loc = null;
   }
+
+  // Persist immediately rather than batching at the end — on a cold cache
+  // with hundreds of complexes, this call can run long enough to hit
+  // Vercel's 60s function cap. Saving per-result means a killed invocation
+  // still keeps whatever it resolved before the cutoff, so the next cron
+  // run only has to geocode what's still missing instead of starting over.
+  await prisma.complexLocationCache.upsert({
+    where: { districtId_complexName: { districtId, complexName } },
+    update: { lat: loc?.lat ?? null, lng: loc?.lng ?? null },
+    create: { districtId, complexName, lat: loc?.lat ?? null, lng: loc?.lng ?? null },
+  });
+
+  return loc;
 }
 
 async function runWithConcurrency<T, R>(
@@ -75,22 +89,7 @@ export async function resolveComplexLocations(
   if (missing.length === 0) return result;
 
   const resolved = await runWithConcurrency(missing, CONCURRENCY, (name) =>
-    geocodeOne(name, near, radiusM),
-  );
-
-  await prisma.$transaction(
-    missing.map((name, i) =>
-      prisma.complexLocationCache.upsert({
-        where: { districtId_complexName: { districtId, complexName: name } },
-        update: { lat: resolved[i]?.lat ?? null, lng: resolved[i]?.lng ?? null },
-        create: {
-          districtId,
-          complexName: name,
-          lat: resolved[i]?.lat ?? null,
-          lng: resolved[i]?.lng ?? null,
-        },
-      }),
-    ),
+    geocodeOne(districtId, name, near, radiusM),
   );
 
   missing.forEach((name, i) => result.set(name, resolved[i]));
