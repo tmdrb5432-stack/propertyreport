@@ -19,8 +19,16 @@ export interface DartCorpCodeEntry {
   modifyDate: string | null;
 }
 
-function extractTag(block: string, tag: string): string | null {
-  const match = block.match(new RegExp(`<${tag}>(.*?)</${tag}>`, "s"));
+// Compiled once and reused across all ~100k <list> blocks in corpCode.xml —
+// `new RegExp` per tag per block was a measurable chunk of the seed route's
+// runtime at that volume.
+const STOCK_CODE_RE = /<stock_code>([\s\S]*?)<\/stock_code>/;
+const CORP_CODE_RE = /<corp_code>([\s\S]*?)<\/corp_code>/;
+const CORP_NAME_RE = /<corp_name>([\s\S]*?)<\/corp_name>/;
+const MODIFY_DATE_RE = /<modify_date>([\s\S]*?)<\/modify_date>/;
+
+function extractMatch(block: string, re: RegExp): string | null {
+  const match = block.match(re);
   return match ? match[1].trim() : null;
 }
 
@@ -48,16 +56,16 @@ export async function fetchListedCorpCodes(): Promise<DartCorpCodeEntry[]> {
   const results: DartCorpCodeEntry[] = [];
   const listBlocks = xml.match(/<list>[\s\S]*?<\/list>/g) ?? [];
   for (const block of listBlocks) {
-    const stockCode = extractTag(block, "stock_code");
+    const stockCode = extractMatch(block, STOCK_CODE_RE);
     if (!stockCode) continue; // unlisted — no empSttus data available
-    const corpCode = extractTag(block, "corp_code");
-    const corpName = extractTag(block, "corp_name");
+    const corpCode = extractMatch(block, CORP_CODE_RE);
+    const corpName = extractMatch(block, CORP_NAME_RE);
     if (!corpCode || !corpName) continue;
     results.push({
       corpCode,
       corpName,
       stockCode,
-      modifyDate: extractTag(block, "modify_date"),
+      modifyDate: extractMatch(block, MODIFY_DATE_RE),
     });
   }
 
