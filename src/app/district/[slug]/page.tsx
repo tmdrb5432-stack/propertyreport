@@ -129,22 +129,24 @@ export default async function DistrictDetailPage({
         </div>
       </div>
 
-      <section className="mb-8">
-        <SectionHeading color={chartColors.series1Blue}>주요회사</SectionHeading>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-          <CompanyList companies={district.notableCompanies} />
+      <section className="mb-8 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        <div>
+          <SectionHeading color={chartColors.series1Blue}>주요회사</SectionHeading>
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+            <CompanyList companies={district.notableCompanies} />
+          </div>
         </div>
-      </section>
 
-      <section className="mb-8">
-        <SectionHeading color={chartColors.series1Blue}>
-          단지별 실거래가 TOP 5{" "}
-          <span className="font-normal text-neutral-400">
-            ({isRealTransactionData ? "국토부 실거래 신고 기준" : "mock"}, 반경 5km)
-          </span>
-        </SectionHeading>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-          <ComplexMapExplorer district={district} complexes={topComplexes} />
+        <div>
+          <SectionHeading color={chartColors.series1Blue}>
+            단지별 실거래가 TOP 5{" "}
+            <span className="font-normal text-neutral-400">
+              ({isRealTransactionData ? "국토부 실거래 신고 기준" : "mock"}, 반경 5km)
+            </span>
+          </SectionHeading>
+          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+            <ComplexMapExplorer district={district} complexes={topComplexes} />
+          </div>
         </div>
       </section>
 
