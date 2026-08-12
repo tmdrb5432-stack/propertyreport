@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { RecommendedComplex } from "@/lib/queries";
 import { DISTRICTS } from "@/lib/districts";
@@ -68,13 +68,6 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
   const [areaBand, setAreaBand] = useState<(typeof AREA_BANDS)[number]["key"]>("all");
   const [priceBand, setPriceBand] = useState<(typeof PRICE_BANDS)[number]["key"]>("all");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const detailRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (selectedKey) {
-      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [selectedKey]);
 
   function toggleDistrict(id: string) {
     setDistrictFilter((prev) => {
@@ -106,12 +99,14 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
   const selected = results.find((c) => keyOf(c) === selectedKey) ?? null;
 
   const markers = results
-    .filter((c) => c.lat !== null && c.lng !== null)
-    .map((c, i) => ({
-      id: keyOf(c),
-      lat: c.lat as number,
-      lng: c.lng as number,
-      label: `${i + 1}. ${c.complexName}`,
+    .map((c, i) => ({ complex: c, rank: i + 1 }))
+    .filter(({ complex }) => complex.lat !== null && complex.lng !== null)
+    .map(({ complex, rank }) => ({
+      id: keyOf(complex),
+      lat: complex.lat as number,
+      lng: complex.lng as number,
+      label: `${rank}. ${complex.complexName}`,
+      rank,
     }));
   const hasSelectedCoords = selected?.lat != null && selected?.lng != null;
   const mapCenter = hasSelectedCoords
@@ -189,22 +184,42 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
         <p className="text-sm text-neutral-500">조건에 맞는 단지가 없습니다. 필터를 넓혀보세요.</p>
       ) : (
         <>
-          <div className="mb-6 h-72 overflow-hidden rounded-2xl border border-neutral-200 shadow-sm dark:border-neutral-800">
-            {markers.length > 0 ? (
-              <KakaoMapView
-                markers={markers}
-                center={mapCenter}
-                level={hasSelectedCoords ? 4 : OVERVIEW_LEVEL}
-                onMarkerClick={setSelectedKey}
-              />
+          <div className="mb-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+            <div className="h-80 overflow-hidden rounded-2xl border border-neutral-200 shadow-sm dark:border-neutral-800">
+              {markers.length > 0 ? (
+                <KakaoMapView
+                  markers={markers}
+                  center={mapCenter}
+                  level={hasSelectedCoords ? 4 : OVERVIEW_LEVEL}
+                  onMarkerClick={setSelectedKey}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-neutral-50 text-sm text-neutral-400 dark:bg-neutral-900">
+                  단지 위치를 아직 찾지 못했습니다. 잠시 후 다시 시도해주세요.
+                </div>
+              )}
+            </div>
+
+            {selected ? (
+              <div key={selectedKey} className="panel-enter">
+                <ComplexDetailPanel
+                  complex={selected}
+                  districtNameKo={selected.districtNameKo}
+                  reasons={selected.reasons}
+                  onClose={() => setSelectedKey(null)}
+                />
+              </div>
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-neutral-50 text-sm text-neutral-400 dark:bg-neutral-900">
-                단지 위치를 아직 찾지 못했습니다. 잠시 후 다시 시도해주세요.
+              <div className="flex h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 p-6 text-center dark:border-neutral-700">
+                <p className="text-sm text-neutral-400">
+                  아래 목록이나 지도의 번호를 클릭하면
+                  <br />그 단지의 실거래가 추이 · 현황이 여기에 표시됩니다.
+                </p>
               </div>
             )}
           </div>
 
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {results.map((c, i) => {
               const key = keyOf(c);
               const isSelected = selectedKey === key;
@@ -292,17 +307,6 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
               );
             })}
           </div>
-
-          {selected && (
-            <div ref={detailRef} key={selectedKey} className="panel-enter scroll-mt-4">
-              <ComplexDetailPanel
-                complex={selected}
-                districtNameKo={selected.districtNameKo}
-                reasons={selected.reasons}
-                onClose={() => setSelectedKey(null)}
-              />
-            </div>
-          )}
         </>
       )}
     </div>
