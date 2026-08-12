@@ -8,7 +8,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-sans-kr), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--font-serif-kr), Georgia, serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,4 +38,30 @@ body {
 
 .panel-enter {
   animation: panel-enter 0.25s ease-out;
+}
+
+@keyframes sheet-enter {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sheet-enter {
+  animation: sheet-enter 0.25s ease-out;
+}
+
+@keyframes backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.backdrop-enter {
+  animation: backdrop-enter 0.2s ease-out;
 }

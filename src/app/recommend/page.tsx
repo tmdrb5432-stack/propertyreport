@@ -24,7 +24,7 @@ export default async function RecommendPage() {
         >
           저평가 매물 찾기
         </span>
-        <h1 className="text-2xl font-bold text-neutral-900 sm:text-3xl dark:text-neutral-50">
+        <h1 className="font-serif text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl dark:text-neutral-50">
           직주근접 좋고 가격도 괜찮은 아파트
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-neutral-500">
