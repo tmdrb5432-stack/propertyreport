@@ -487,6 +487,65 @@ function buildRecommendReasons(c: {
 }
 
 /**
+ * Same scoring as getRecommendedComplexes but restricted to one district's
+ * own complexes — affordability/undervaluation are computed relative to
+ * that district's candidate pool only, so "저평가" here means "cheap for
+ * this district," not "cheap across all 5." Powers the per-district 추천
+ *매물 finder embedded in the district detail page.
+ */
+export async function getDistrictRecommendedComplexes(
+  districtId: string,
+): Promise<RecommendedComplex[]> {
+  const district = DISTRICTS.find((d) => d.id === districtId);
+  if (!district) return [];
+
+  const [rows, jobDensityByDistrict] = await Promise.all([
+    fetchComplexHistoryRows(districtId),
+    getDistrictJobDensityMap(),
+  ]);
+  const summaries = buildComplexSummaries(rows);
+  const withLocation = await attachComplexLocations(districtId, district, summaries);
+  const withJobProximity = attachJobProximity(withLocation, districtId, jobDensityByDistrict);
+  if (withJobProximity.length === 0) return [];
+
+  const { affordability, undervaluation } = computeValueScores(
+    withJobProximity.map((c) => ({
+      latestAvgPricePerPyeong: c.latestAvgPricePerPyeong ?? 0,
+      priceGrowthRatio: priceGrowthRatio(c.trend),
+    })),
+  );
+
+  return withJobProximity
+    .map((c, i) => {
+      const affordabilityScore = Math.round(affordability[i]);
+      const undervaluationScore = Math.round(undervaluation[i]);
+      const recommendScore = Math.round(
+        c.jobProximityScore * 0.4 + affordabilityScore * 0.3 + undervaluationScore * 0.3,
+      );
+      const reasons = buildRecommendReasons({
+        districtNameKo: district.nameKo,
+        jobProximityScore: c.jobProximityScore,
+        affordabilityScore,
+        undervaluationScore,
+        nearestSubwayName: c.nearestSubwayName,
+        nearestSubwayDistanceM: c.nearestSubwayDistanceM,
+        distanceToDistrictM: c.distanceToDistrictM,
+        latestAvgPricePerPyeong: c.latestAvgPricePerPyeong,
+      });
+      return {
+        ...c,
+        districtId,
+        districtNameKo: district.nameKo,
+        affordabilityScore,
+        undervaluationScore,
+        recommendScore,
+        reasons,
+      };
+    })
+    .sort((a, b) => b.recommendScore - a.recommendScore);
+}
+
+/**
  * Every apartment complex across all 5 districts (not just each district's
  * priciest — the point here is to surface good-value ones, which the
  * price-ranked TOP5 would systematically exclude), scored and sorted for

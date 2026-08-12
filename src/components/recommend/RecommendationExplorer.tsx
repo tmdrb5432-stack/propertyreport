@@ -60,7 +60,17 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
   );
 }
 
-export function RecommendationExplorer({ complexes }: { complexes: RecommendedComplex[] }) {
+export function RecommendationExplorer({
+  complexes,
+  showDistrictFilter = true,
+  fallbackCenter = OVERVIEW_CENTER,
+}: {
+  complexes: RecommendedComplex[];
+  /** Hide the 지역 filter row — used when the caller has already scoped `complexes` to one district. */
+  showDistrictFilter?: boolean;
+  /** Where the map centers before any result has resolved coordinates. Defaults to a wide 5-district overview. */
+  fallbackCenter?: { lat: number; lng: number };
+}) {
   const [districtFilter, setDistrictFilter] = useState<Set<string>>(
     () => new Set(DISTRICTS.map((d) => d.id)),
   );
@@ -113,33 +123,35 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
   const hasSelectedCoords = selected?.lat != null && selected?.lng != null;
   const mapCenter = hasSelectedCoords
     ? { lat: selected!.lat as number, lng: selected!.lng as number }
-    : OVERVIEW_CENTER;
+    : fallbackCenter;
 
   return (
     <div>
       <div className="mb-6 space-y-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-        <div>
-          <p className="mb-1.5 text-xs text-neutral-400">지역</p>
-          <div className="flex flex-wrap gap-1.5">
-            {DISTRICTS.map((d) => {
-              const active = districtFilter.has(d.id);
-              return (
-                <button
-                  key={d.id}
-                  onClick={() => toggleDistrict(d.id)}
-                  className="rounded-full px-3 py-1 text-xs font-medium transition"
-                  style={
-                    active
-                      ? { background: chartColors.series1Blue, color: "#fff" }
-                      : { background: chartColors.gridline, color: chartColors.secondaryInk }
-                  }
-                >
-                  {d.nameKo}
-                </button>
-              );
-            })}
+        {showDistrictFilter && (
+          <div>
+            <p className="mb-1.5 text-xs text-neutral-400">지역</p>
+            <div className="flex flex-wrap gap-1.5">
+              {DISTRICTS.map((d) => {
+                const active = districtFilter.has(d.id);
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => toggleDistrict(d.id)}
+                    className="rounded-full px-3 py-1 text-xs font-medium transition"
+                    style={
+                      active
+                        ? { background: chartColors.series1Blue, color: "#fff" }
+                        : { background: chartColors.gridline, color: chartColors.secondaryInk }
+                    }
+                  >
+                    {d.nameKo}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         <div>
           <p className="mb-1.5 text-xs text-neutral-400">평형</p>
@@ -283,13 +295,15 @@ export function RecommendationExplorer({ complexes }: { complexes: RecommendedCo
                         <p className="text-[10px] text-neutral-400">평균 실거래가</p>
                       </div>
                     </div>
-                    <Link
-                      href={`/district/${selected.districtId}`}
-                      className="text-xs font-medium hover:underline"
-                      style={{ color: chartColors.series1Blue }}
-                    >
-                      {selected.districtNameKo} 지구 상세 보기 →
-                    </Link>
+                    {showDistrictFilter && (
+                      <Link
+                        href={`/district/${selected.districtId}`}
+                        className="text-xs font-medium hover:underline"
+                        style={{ color: chartColors.series1Blue }}
+                      >
+                        {selected.districtNameKo} 지구 상세 보기 →
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
