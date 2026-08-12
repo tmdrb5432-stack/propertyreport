@@ -68,7 +68,7 @@ export default async function DistrictDetailPage({
         </span>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900 sm:text-3xl dark:text-neutral-50">
+            <h1 className="font-serif text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl dark:text-neutral-50">
               {district.nameKo}
             </h1>
             <p className="text-sm text-neutral-400">{district.nameEn}</p>
