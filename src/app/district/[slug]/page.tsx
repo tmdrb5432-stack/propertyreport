@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDistrictDetail, getTopComplexesForDistrict } from "@/lib/queries";
+import {
+  getDistrictDetail,
+  getDistrictRecommendedComplexes,
+  getTopComplexesForDistrict,
+} from "@/lib/queries";
 import { TransitScoreGauge } from "@/components/charts/TransitScoreGauge";
 import { CompanyComplexSection } from "@/components/district/CompanyComplexSection";
 import { FocusedCompanyProvider } from "@/components/district/FocusedCompanyContext";
@@ -10,6 +14,7 @@ import { SectionHeading } from "@/components/district/SectionHeading";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
 import { AskingPriceTrendChart } from "@/components/charts/AskingPriceTrendChart";
 import { MigrationTrendChart } from "@/components/charts/MigrationTrendChart";
+import { RecommendationExplorer } from "@/components/recommend/RecommendationExplorer";
 import { chartColors } from "@/lib/chartTheme";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +29,10 @@ export default async function DistrictDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [district, topComplexes] = await Promise.all([
+  const [district, topComplexes, recommendedComplexes] = await Promise.all([
     getDistrictDetail(slug),
     getTopComplexesForDistrict(slug),
+    getDistrictRecommendedComplexes(slug),
   ]);
   if (!district) notFound();
 
@@ -123,6 +129,21 @@ export default async function DistrictDetailPage({
           isRealTransactionData={isRealTransactionData}
         />
       </FocusedCompanyProvider>
+
+      <section className="mb-8">
+        <SectionHeading color={chartColors.series1Blue}>
+          {district.nameKo}에서 직주근접 좋고 가격도 괜찮은 아파트
+        </SectionHeading>
+        <p className="mb-4 text-xs text-neutral-400">
+          이 지구의 실거래가 데이터를 기준으로 직주근접(일자리 밀도 + 업무지구·지하철역 거리)과
+          가격(평당가, 최근 상승률)을 함께 봐서 이 지구 안에서 상대적으로 괜찮은 단지를 찾아줍니다.
+        </p>
+        <RecommendationExplorer
+          complexes={recommendedComplexes}
+          showDistrictFilter={false}
+          fallbackCenter={{ lat: district.lat, lng: district.lng }}
+        />
+      </section>
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
