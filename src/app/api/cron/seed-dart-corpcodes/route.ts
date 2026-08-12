@@ -5,6 +5,13 @@ import { fetchListedCorpCodes } from "@/lib/dart/client";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+// opendart.fss.or.kr (금융감독원) is slow/unreachable from Vercel's default
+// US region (iad1) — the fetch just hung for the full 60s with zero bytes
+// received. Literal region codes (e.g. "icn1") are deprecated for
+// preferredRegion on Vercel and throw at build time — "home" defers to the
+// project's configured Function Region instead, which must be set to Seoul
+// in Vercel dashboard > Settings > Functions > Function Region.
+export const preferredRegion = "home";
 
 // One-time/occasional refresh of the listed-company corp code table used to
 // match Kakao place names to real DART employee data. Bounded to listed
