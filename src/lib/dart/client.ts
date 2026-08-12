@@ -38,23 +38,27 @@ function extractMatch(block: string, re: RegExp): string | null {
  * the only ones with a public 직원현황 disclosure via empSttus.json).
  */
 export async function fetchListedCorpCodes(): Promise<DartCorpCodeEntry[]> {
+  const t0 = Date.now();
   const key = getDartKey();
   const url = `${DART_BASE}/corpCode.xml?crtfc_key=${key}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`DART corpCode.xml request failed: ${res.status}`);
   }
-
   const buffer = Buffer.from(await res.arrayBuffer());
+  console.log(`[dart] downloaded ${buffer.length} bytes at ${Date.now() - t0}ms`);
+
   const zip = new AdmZip(buffer);
   const entry = zip.getEntries().find((e) => e.entryName.toLowerCase().endsWith(".xml"));
   if (!entry) {
     throw new Error("DART corpCode.xml zip contained no XML entry");
   }
   const xml = entry.getData().toString("utf-8");
+  console.log(`[dart] unzipped to ${xml.length} chars at ${Date.now() - t0}ms`);
 
   const results: DartCorpCodeEntry[] = [];
   const listBlocks = xml.match(/<list>[\s\S]*?<\/list>/g) ?? [];
+  console.log(`[dart] found ${listBlocks.length} <list> blocks at ${Date.now() - t0}ms`);
   for (const block of listBlocks) {
     const stockCode = extractMatch(block, STOCK_CODE_RE);
     if (!stockCode) continue; // unlisted — no empSttus data available
@@ -68,6 +72,7 @@ export async function fetchListedCorpCodes(): Promise<DartCorpCodeEntry[]> {
       modifyDate: extractMatch(block, MODIFY_DATE_RE),
     });
   }
+  console.log(`[dart] parsed ${results.length} listed entries at ${Date.now() - t0}ms`);
 
   return results;
 }
