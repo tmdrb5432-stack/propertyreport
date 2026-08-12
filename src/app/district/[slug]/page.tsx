@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { getDistrictDetail, getTopComplexesForDistrict } from "@/lib/queries";
 import { KakaoMapView } from "@/components/map/KakaoMapView";
 import { TransitScoreGauge } from "@/components/charts/TransitScoreGauge";
-import { CompanyList } from "@/components/district/CompanyList";
-import { ComplexMapExplorer } from "@/components/district/ComplexMapExplorer";
+import { CompanyComplexSection } from "@/components/district/CompanyComplexSection";
 import { FreshnessRow } from "@/components/district/FreshnessBadge";
+import { SectionHeading } from "@/components/district/SectionHeading";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
 import { AskingPriceTrendChart } from "@/components/charts/AskingPriceTrendChart";
 import { MigrationTrendChart } from "@/components/charts/MigrationTrendChart";
@@ -15,15 +15,6 @@ export const dynamic = "force-dynamic";
 
 function formatMonth(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function SectionHeading({ color, children }: { color: string; children: React.ReactNode }) {
-  return (
-    <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-neutral-600 dark:text-neutral-300">
-      <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-      {children}
-    </h2>
-  );
 }
 
 export default async function DistrictDetailPage({
@@ -129,26 +120,12 @@ export default async function DistrictDetailPage({
         </div>
       </div>
 
-      <section className="mb-8 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <div>
-          <SectionHeading color={chartColors.series1Blue}>주요회사</SectionHeading>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-            <CompanyList companies={district.notableCompanies} />
-          </div>
-        </div>
-
-        <div>
-          <SectionHeading color={chartColors.series1Blue}>
-            단지별 실거래가 TOP 5{" "}
-            <span className="font-normal text-neutral-400">
-              ({isRealTransactionData ? "국토부 실거래 신고 기준" : "mock"}, 반경 5km)
-            </span>
-          </SectionHeading>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-            <ComplexMapExplorer district={district} complexes={topComplexes} />
-          </div>
-        </div>
-      </section>
+      <CompanyComplexSection
+        district={district}
+        companies={district.notableCompanies}
+        complexes={topComplexes}
+        isRealTransactionData={isRealTransactionData}
+      />
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
