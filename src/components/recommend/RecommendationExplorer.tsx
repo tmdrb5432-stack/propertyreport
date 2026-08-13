@@ -236,7 +236,7 @@ export function RecommendationExplorer({
                       <div className="flex items-center gap-2">
                         <RankBadge rank={i + 1} />
                         <div className="min-w-0">
-                          <p className="truncate font-serif text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+                          <p className="truncate text-sm font-bold text-neutral-900 dark:text-neutral-50">
                             {c.complexName}
                           </p>
                           <p className="text-xs text-neutral-400">{c.districtNameKo}</p>
