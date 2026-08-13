@@ -28,9 +28,20 @@ export function ComplexDetailPanel({
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-md ring-1 ring-neutral-900/5 dark:border-neutral-800 dark:bg-neutral-950">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-50">
-          {complex.complexName}
-        </h3>
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-50">
+            {complex.complexName}
+          </h3>
+          <a
+            href={`https://search.naver.com/search.naver?query=${encodeURIComponent(`${complex.complexName} 아파트`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+            style={{ color: chartColors.series1Blue }}
+          >
+            네이버에서 매물·시세 보기 ↗
+          </a>
+        </div>
         <button
           type="button"
           onClick={onClose}
