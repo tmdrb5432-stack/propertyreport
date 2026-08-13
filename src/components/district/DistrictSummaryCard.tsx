@@ -65,7 +65,7 @@ export function DistrictSummaryCard({
         <div className="flex items-center gap-2.5">
           <RankBadge rank={rank} />
           <div>
-            <h3 className="font-serif text-lg leading-tight font-semibold text-neutral-900 dark:text-neutral-50">
+            <h3 className="text-lg leading-tight font-bold text-neutral-900 dark:text-neutral-50">
               {district.nameKo}
             </h3>
             <p className="text-xs text-neutral-400">{district.nameEn}</p>

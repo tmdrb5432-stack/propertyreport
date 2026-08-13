@@ -25,7 +25,7 @@ export default async function OverviewPage() {
           >
             5대 업무지구 비교 분석
           </span>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl dark:text-neutral-50">
+          <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900 sm:text-3xl dark:text-neutral-50">
             부동산 분석 대시보드
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm text-neutral-500">

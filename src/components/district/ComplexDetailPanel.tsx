@@ -23,7 +23,7 @@ export function ComplexDetailPanel({
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-md ring-1 ring-neutral-900/5 dark:border-neutral-800 dark:bg-neutral-950">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="font-serif text-base font-semibold text-neutral-900 dark:text-neutral-50">
+        <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-50">
           {complex.complexName}
         </h3>
         <button
