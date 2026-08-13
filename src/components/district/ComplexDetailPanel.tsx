@@ -37,7 +37,7 @@ export function ComplexDetailPanel({
             {complex.buildYear ? ` · ${complex.buildYear}년 준공` : ""}
           </p>
           <a
-            href={`https://search.naver.com/search.naver?query=${encodeURIComponent(`${complex.complexName} ${complex.propertyType}`)}`}
+            href={`https://search.naver.com/search.naver?query=${encodeURIComponent(`${districtNameKo} ${complex.complexName} ${complex.propertyType}`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"
