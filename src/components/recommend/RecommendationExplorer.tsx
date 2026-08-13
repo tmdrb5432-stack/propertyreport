@@ -34,6 +34,21 @@ const PRICE_BANDS = [
   { key: "over12", label: "12억 초과", test: (eok: number) => eok > 12 },
 ] as const;
 
+const PROPERTY_TYPE_BANDS = [
+  { key: "all", label: "전체 유형", test: () => true },
+  { key: "apt", label: "아파트", test: (t: string) => t === "아파트" },
+  { key: "officetel", label: "오피스텔", test: (t: string) => t === "오피스텔" },
+] as const;
+
+const CURRENT_YEAR = new Date().getFullYear();
+const BUILD_AGE_BANDS = [
+  { key: "all", label: "전체 연식", test: () => true },
+  { key: "new", label: "5년 이하(신축)", test: (age: number) => age <= 5 },
+  { key: "semiNew", label: "5~15년", test: (age: number) => age > 5 && age <= 15 },
+  { key: "mid", label: "15~25년", test: (age: number) => age > 15 && age <= 25 },
+  { key: "old", label: "25년 초과(구축)", test: (age: number) => age > 25 },
+] as const;
+
 function keyOf(c: { districtId: string; complexName: string }): string {
   return `${c.districtId}::${c.complexName}`;
 }
@@ -76,6 +91,9 @@ export function RecommendationExplorer({
   );
   const [areaBand, setAreaBand] = useState<(typeof AREA_BANDS)[number]["key"]>("all");
   const [priceBand, setPriceBand] = useState<(typeof PRICE_BANDS)[number]["key"]>("all");
+  const [propertyTypeBand, setPropertyTypeBand] =
+    useState<(typeof PROPERTY_TYPE_BANDS)[number]["key"]>("all");
+  const [buildAgeBand, setBuildAgeBand] = useState<(typeof BUILD_AGE_BANDS)[number]["key"]>("all");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   function toggleDistrict(id: string) {
@@ -90,6 +108,8 @@ export function RecommendationExplorer({
   const results = useMemo(() => {
     const areaTest = AREA_BANDS.find((b) => b.key === areaBand)!.test;
     const priceTest = PRICE_BANDS.find((b) => b.key === priceBand)!.test;
+    const propertyTypeTest = PROPERTY_TYPE_BANDS.find((b) => b.key === propertyTypeBand)!.test;
+    const buildAgeTest = BUILD_AGE_BANDS.find((b) => b.key === buildAgeBand)!.test;
 
     return complexes
       .filter((c) => districtFilter.has(c.districtId))
@@ -102,8 +122,14 @@ export function RecommendationExplorer({
         if (c.latestAvgPriceTotal === null) return false;
         return priceTest(c.latestAvgPriceTotal / 10000);
       })
+      .filter((c) => propertyTypeTest(c.propertyType))
+      .filter((c) => {
+        if (buildAgeBand === "all") return true;
+        if (c.buildYear === null) return false;
+        return buildAgeTest(CURRENT_YEAR - c.buildYear);
+      })
       .slice(0, RESULT_COUNT);
-  }, [complexes, districtFilter, areaBand, priceBand]);
+  }, [complexes, districtFilter, areaBand, priceBand, propertyTypeBand, buildAgeBand]);
 
   // Always shows something on the right — defaults to the #1 result so both
   // the map and the detail pane start focused on a concrete complex, and
@@ -192,6 +218,46 @@ export function RecommendationExplorer({
             ))}
           </div>
         </div>
+
+        <div>
+          <p className="mb-1.5 text-xs text-neutral-400">건물유형</p>
+          <div className="flex flex-wrap gap-1.5">
+            {PROPERTY_TYPE_BANDS.map((b) => (
+              <button
+                key={b.key}
+                onClick={() => setPropertyTypeBand(b.key)}
+                className="rounded-full px-3 py-1 text-xs font-medium transition"
+                style={
+                  propertyTypeBand === b.key
+                    ? { background: chartColors.series4Yellow, color: "#fff" }
+                    : { background: chartColors.gridline, color: chartColors.secondaryInk }
+                }
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-xs text-neutral-400">준공연차</p>
+          <div className="flex flex-wrap gap-1.5">
+            {BUILD_AGE_BANDS.map((b) => (
+              <button
+                key={b.key}
+                onClick={() => setBuildAgeBand(b.key)}
+                className="rounded-full px-3 py-1 text-xs font-medium transition"
+                style={
+                  buildAgeBand === b.key
+                    ? { background: chartColors.series5Magenta, color: "#fff" }
+                    : { background: chartColors.gridline, color: chartColors.secondaryInk }
+                }
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {results.length === 0 ? (
@@ -239,7 +305,10 @@ export function RecommendationExplorer({
                           <p className="truncate text-sm font-bold text-neutral-900 dark:text-neutral-50">
                             {c.complexName}
                           </p>
-                          <p className="text-xs text-neutral-400">{c.districtNameKo}</p>
+                          <p className="text-xs text-neutral-400">
+                            {c.districtNameKo} · {c.propertyType}
+                            {c.buildYear ? ` · ${c.buildYear}년 준공` : ""}
+                          </p>
                         </div>
                       </div>
                       <div className="shrink-0 text-right">

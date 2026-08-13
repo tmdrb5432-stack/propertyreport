@@ -54,6 +54,8 @@ export interface ComplexTradeRecord {
   areaPyeong: number;
   pricePerPyeong: number;
   priceTotal: number; // 만원
+  /** Optional — absent on rows cached before this field was added. */
+  buildYear?: number | null;
 }
 
 export interface ComplexTransactionSnapshotInput {
