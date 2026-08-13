@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { TopComplex } from "@/lib/queries";
 import { ComplexTradeTable } from "@/components/district/ComplexTradeTable";
 import { TransactionTrendChart } from "@/components/charts/TransactionTrendChart";
@@ -20,6 +23,8 @@ export function ComplexDetailPanel({
   /** Only present when opened from the 추천 매물 finder — why this one ranked well. */
   reasons?: string[];
 }) {
+  const [showTrend, setShowTrend] = useState(false);
+
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-md ring-1 ring-neutral-900/5 dark:border-neutral-800 dark:bg-neutral-950">
       <div className="flex items-start justify-between gap-2">
@@ -76,14 +81,28 @@ export function ComplexDetailPanel({
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium text-neutral-500">실거래가 추이</p>
-        <TransactionTrendChart
-          data={complex.trend.map((t) => ({
-            periodDate: formatMonth(t.periodDate),
-            avgPricePerPyeong: t.avgPricePerPyeong,
-            transactionCount: t.transactionCount,
-          }))}
-        />
+        <button
+          type="button"
+          onClick={() => setShowTrend((v) => !v)}
+          className="flex w-full items-center justify-between text-xs font-medium text-neutral-500"
+        >
+          <span>실거래가 추이</span>
+          <span className="flex items-center gap-0.5 font-semibold" style={{ color: chartColors.series1Blue }}>
+            {showTrend ? "접기" : "펼치기"}
+            <span className={`transition-transform ${showTrend ? "rotate-180" : ""}`}>▾</span>
+          </span>
+        </button>
+        {showTrend && (
+          <div className="mt-2">
+            <TransactionTrendChart
+              data={complex.trend.map((t) => ({
+                periodDate: formatMonth(t.periodDate),
+                avgPricePerPyeong: t.avgPricePerPyeong,
+                transactionCount: t.transactionCount,
+              }))}
+            />
+          </div>
+        )}
       </div>
 
       <div>
