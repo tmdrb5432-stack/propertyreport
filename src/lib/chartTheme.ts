@@ -12,6 +12,8 @@ export const chartColors = {
   series1Blue: "#2a78d6", // 실거래가 / 전입
   series2Orange: "#eb6834", // 호가 / 전출
   series3Aqua: "#1baf7a",
+  series4Yellow: "#eda100",
+  series5Magenta: "#e87ba4",
   goodGreen: "#0ca30c",
   criticalRed: "#d03b3b",
 } as const;

@@ -32,8 +32,12 @@ export function ComplexDetailPanel({
           <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-50">
             {complex.complexName}
           </h3>
+          <p className="text-xs text-neutral-400">
+            {complex.propertyType}
+            {complex.buildYear ? ` · ${complex.buildYear}년 준공` : ""}
+          </p>
           <a
-            href={`https://search.naver.com/search.naver?query=${encodeURIComponent(`${complex.complexName} 아파트`)}`}
+            href={`https://search.naver.com/search.naver?query=${encodeURIComponent(`${complex.complexName} ${complex.propertyType}`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"

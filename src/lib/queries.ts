@@ -218,6 +218,10 @@ export interface ComplexTransactionPoint {
 
 export interface TopComplex {
   complexName: string;
+  /** "아파트" | "오피스텔" */
+  propertyType: string;
+  /** Construction year, from MOLIT's buildYear field — null on pre-migration cached rows. */
+  buildYear: number | null;
   latestPeriodDate: Date;
   latestAvgPricePerPyeong: number | null;
   latestAvgPriceTotal: number | null;
@@ -251,6 +255,7 @@ function parseTradeRecords(raw: unknown): ComplexTradeRecord[] {
 
 type ComplexHistoryRow = {
   complexName: string;
+  propertyType: string;
   periodDate: Date;
   avgPricePerPyeong: number | null;
   avgPriceTotal: number | null;
@@ -272,10 +277,11 @@ type ComplexWithLocation = Omit<TopComplex, "jobProximityScore">;
 
 async function fetchComplexHistoryRows(districtId: string): Promise<ComplexHistoryRow[]> {
   return prisma.complexTransactionSnapshot.findMany({
-    where: { districtId, propertyType: "아파트" },
+    where: { districtId },
     orderBy: { periodDate: "asc" },
     select: {
       complexName: true,
+      propertyType: true,
       periodDate: true,
       avgPricePerPyeong: true,
       avgPriceTotal: true,
@@ -287,15 +293,18 @@ async function fetchComplexHistoryRows(districtId: string): Promise<ComplexHisto
 
 /** Groups raw monthly rows into one summary per complex — unsorted, unfiltered by rank. */
 function buildComplexSummaries(rows: ComplexHistoryRow[]): ComplexSummary[] {
+  // Keyed by name+type — 아파트/오피스텔 sharing a name in the same district
+  // is unlikely but shouldn't merge if it happens.
   const byComplex = new Map<string, ComplexHistoryRow[]>();
   for (const row of rows) {
-    const existing = byComplex.get(row.complexName);
+    const key = `${row.complexName}::${row.propertyType}`;
+    const existing = byComplex.get(key);
     if (existing) existing.push(row);
-    else byComplex.set(row.complexName, [row]);
+    else byComplex.set(key, [row]);
   }
 
   const complexes: ComplexSummary[] = [];
-  for (const [complexName, history] of byComplex) {
+  for (const history of byComplex.values()) {
     const latest = history[history.length - 1];
     if (latest.avgPricePerPyeong === null) continue;
 
@@ -305,7 +314,9 @@ function buildComplexSummaries(rows: ComplexHistoryRow[]): ComplexSummary[] {
       .slice(0, RECENT_TRADES_LIMIT);
 
     complexes.push({
-      complexName,
+      complexName: latest.complexName,
+      propertyType: latest.propertyType,
+      buildYear: recentTrades.find((t) => t.buildYear != null)?.buildYear ?? null,
       latestPeriodDate: latest.periodDate,
       latestAvgPricePerPyeong: latest.avgPricePerPyeong,
       latestAvgPriceTotal: latest.avgPriceTotal,
@@ -408,6 +419,10 @@ function attachJobProximity(
  * per group, then order by that value" query, so this fetches the full
  * per-complex history (bounded — a handful of complexes x 6 months per
  * district) and does the latest-per-complex + ranking in JS.
+ *
+ * 아파트만 대상으로 한다 — 오피스텔은 가격대가 달라 같은 평당가 순위에
+ * 섞으면 왜곡되므로, 건물유형을 직접 고를 수 있는 추천 매물 찾기
+ * (getRecommendedComplexes 계열)에서만 함께 다룬다.
  */
 export async function getTopComplexesForDistrict(
   districtId: string,
@@ -417,7 +432,7 @@ export async function getTopComplexesForDistrict(
     fetchComplexHistoryRows(districtId),
     getDistrictJobDensityMap(),
   ]);
-  const summaries = buildComplexSummaries(rows);
+  const summaries = buildComplexSummaries(rows).filter((c) => c.propertyType === "아파트");
   summaries.sort((a, b) => (b.latestAvgPricePerPyeong ?? 0) - (a.latestAvgPricePerPyeong ?? 0));
   const top = summaries.slice(0, limit);
 

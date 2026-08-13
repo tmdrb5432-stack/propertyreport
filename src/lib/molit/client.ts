@@ -2,7 +2,13 @@
 // from the basic getRTMSDataSvcAptTrade — the user's key is only approved
 // for the basic one, so that's what we call. Same core fields (aptNm,
 // umdNm, dealAmount, excluUseAr, dealYear/Month/Day, buildYear).
-const MOLIT_BASE = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade";
+const APT_BASE = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade";
+// 오피스텔 매매 실거래자료 — a separate data.go.kr service registration from
+// the apartment one above (같은 서비스키를 쓰지만 별도 활용신청 필요). Field
+// names match the apartment endpoint except the name tag (offiNm vs aptNm)
+// and a handful of apartment-only columns (aptDong, 매도/매수자 등) that we
+// don't read from either endpoint anyway.
+const OFFICETEL_BASE = "https://apis.data.go.kr/1613000/RTMSDataSvcOffiTrade/getRTMSDataSvcOffiTrade";
 const ROWS_PER_PAGE = 1000;
 const MAX_PAGES = 5; // 5,000 trades/month/sigungu ceiling — generous for any single gu.
 
@@ -30,12 +36,12 @@ function extractTag(block: string, tag: string): string {
   return match ? match[1].trim() : "";
 }
 
-function parseItems(xml: string): MolitTradeRow[] {
+function parseItems(xml: string, nameTag: string): MolitTradeRow[] {
   const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
   const rows: MolitTradeRow[] = [];
 
   for (const block of itemBlocks) {
-    const aptName = extractTag(block, "aptNm");
+    const aptName = extractTag(block, nameTag);
     const dong = extractTag(block, "umdNm");
     const amountRaw = extractTag(block, "dealAmount").replace(/,/g, "").trim();
     const areaRaw = extractTag(block, "excluUseAr");
@@ -71,11 +77,12 @@ function extractTotalCount(xml: string): number {
 }
 
 /**
- * 국토교통부 아파트매매 실거래자료 (getRTMSDataSvcAptTrade) for one
- * sigungu (LAWD_CD, 5-digit) and one deal month (YYYYMM). Paginates until
- * all rows for the month are collected.
+ * Shared pager for both MOLIT trade endpoints — they differ only in base
+ * URL and the XML tag holding the complex/officetel name.
  */
-export async function fetchAptTrades(
+async function fetchTrades(
+  baseUrl: string,
+  nameTag: string,
   lawdCd: string,
   dealYmd: string,
 ): Promise<MolitTradeRow[]> {
@@ -83,7 +90,7 @@ export async function fetchAptTrades(
   const rows: MolitTradeRow[] = [];
 
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = new URL(MOLIT_BASE);
+    const url = new URL(baseUrl);
     // The service key from data.go.kr is already URL-encoded ("Encoding" key)
     // or raw ("Decoding" key) depending on which the user copied — decode
     // first (no-op if it was already raw) so URLSearchParams doesn't
@@ -113,7 +120,7 @@ export async function fetchAptTrades(
       throw new Error(`MOLIT API returned error ${resultCode}: ${resultMsg || "unknown error"}`);
     }
 
-    const pageRows = parseItems(xml);
+    const pageRows = parseItems(xml, nameTag);
     rows.push(...pageRows);
 
     const totalCount = extractTotalCount(xml);
@@ -121,4 +128,31 @@ export async function fetchAptTrades(
   }
 
   return rows;
+}
+
+/**
+ * 국토교통부 아파트매매 실거래자료 (getRTMSDataSvcAptTrade) for one
+ * sigungu (LAWD_CD, 5-digit) and one deal month (YYYYMM). Paginates until
+ * all rows for the month are collected.
+ */
+export async function fetchAptTrades(
+  lawdCd: string,
+  dealYmd: string,
+): Promise<MolitTradeRow[]> {
+  return fetchTrades(APT_BASE, "aptNm", lawdCd, dealYmd);
+}
+
+/**
+ * 국토교통부 오피스텔 매매 실거래자료 (getRTMSDataSvcOffiTrade) — same shape
+ * as fetchAptTrades but a separate data.go.kr 활용신청 from the apartment
+ * one. If the caller's key isn't approved for this service yet, MOLIT
+ * returns a SERVICE_KEY_IS_NOT_REGISTERED_ERROR-style resultCode, which
+ * surfaces as a thrown error here — callers should treat officetel data as
+ * optional and not let this break apartment data.
+ */
+export async function fetchOfficetelTrades(
+  lawdCd: string,
+  dealYmd: string,
+): Promise<MolitTradeRow[]> {
+  return fetchTrades(OFFICETEL_BASE, "offiNm", lawdCd, dealYmd);
 }
